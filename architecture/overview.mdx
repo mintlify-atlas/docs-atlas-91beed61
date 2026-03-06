@@ -22,7 +22,7 @@ The zero-system-calls guarantee is enforced at compile time by simply not import
 
 Nash's source code is organized into five main modules, each with a clear responsibility:
 
-```
+```text
 src/
 ├── main.rs
 ├── cli.rs                  CLI flags, REPL, script runner
@@ -111,7 +111,7 @@ Built-in commands that provide shell functionality without invoking external pro
 
 Here's how data flows through Nash when executing a command:
 
-```
+```text
 ┌─────────────────┐
 │  User Input     │  echo hello | grep hello
 │  (String)       │
@@ -158,7 +158,7 @@ Here's how data flows through Nash when executing a command:
 
 From the Nash README (README.md:348-371):
 
-```
+```text
 src/
 ├── main.rs
 ├── cli.rs                  CLI flags, REPL, script runner

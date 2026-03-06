@@ -7,7 +7,7 @@ The Virtual Filesystem (VFS) provides a complete in-memory Unix-like filesystem 
 
 ## Module Structure
 
-```
+```text
 vfs/
 ├── mod.rs      # Core VFS operations (read, write, mkdir, rm, list)
 ├── node.rs     # FsNode enum (File | Directory)
@@ -249,7 +249,7 @@ pub fn mkdir_p(&mut self, path: &str) -> Result<()> {
 ```
 
 <Accordion title="Example: mkdir -p /home/alice/projects">
-```
+```text
 Initial state: { "/": Directory, "/home": Directory }
 
 Iterations:
@@ -426,7 +426,7 @@ impl VfsPath {
 ```
 
 <Accordion title="Path Normalization Examples">
-```rust
+```text
 VfsPath::normalize("/home/./user")       // → "/home/user"
 VfsPath::normalize("/home/user/../other") // → "/home/other"
 VfsPath::normalize("home/user")           // → "/home/user" (adds leading /)
@@ -529,7 +529,7 @@ echo x > /config/new.txt # ✗ Error: filesystem is read-only
 
 If multiple mounts overlap, the **most specific** (longest matching prefix) wins:
 
-```rust
+```text
 mounts: [
   { vfs_path: "/data", host_path: "/host/data" },
   { vfs_path: "/data/sensitive", host_path: "/host/secure" },
@@ -585,7 +585,7 @@ Nash uses a flat map instead of a tree structure:
 
 Host mounts are checked **after** in-memory nodes:
 
-```rust
+```text
 1. Check nodes map
 2. If not found, check mounts
 3. If mounted, delegate to std::fs

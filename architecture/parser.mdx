@@ -9,7 +9,7 @@ The parser module converts raw shell input strings into an Abstract Syntax Tree 
 
 The parser is split into three files:
 
-```
+```text
 parser/
 ├── mod.rs      # Parser entrypoint, recursive-descent implementation
 ├── ast.rs      # AST type definitions (Expr, Word, WordPart, RedirectMode)
@@ -24,7 +24,7 @@ The parser and runtime are completely decoupled. The parser produces an `Expr` t
 
 Parsing happens in two phases:
 
-```
+```text
 ┌──────────────────┐
 │  Raw Input       │  "echo hello | grep world"
 └────────┬─────────┘
@@ -292,7 +292,7 @@ pub fn parse(input: &str) -> ParseResult<Expr> {
 
 The parser implements this grammar hierarchy (src/parser/mod.rs:75-229):
 
-```
+```text
 list      = pipeline ( ('&&'|'||'|';') pipeline )*
 pipeline  = redirect ('|' redirect)*
 redirect  = command (redirection)*
@@ -312,7 +312,7 @@ From highest to lowest:
 5. **Conditionals** — `&&`, `||`
 
 <Accordion title="Example: Parse 'echo hello | grep h && wc -l'">
-```
+```text
 Tokens: [Word("echo"), Word("hello"), Pipe, Word("grep"), Word("h"), And, Word("wc"), Word("-l"), Eof]
 
 Parse tree:

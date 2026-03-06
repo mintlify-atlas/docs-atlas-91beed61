@@ -7,7 +7,7 @@ The runtime module evaluates parsed AST expressions and manages execution contex
 
 ## Module Structure
 
-```
+```text
 runtime/
 ├── executor.rs     # AST walker with zero system calls (716 lines)
 ├── context.rs      # Mutable session state (cwd, env, VFS, history)
@@ -22,7 +22,7 @@ The runtime knows nothing about syntax. It receives an `Expr` tree from the pars
 
 Nash uses an **AST walking interpreter**. The `Executor` recursively evaluates `Expr` nodes:
 
-```
+```text
 ┌──────────────────┐
 │  AST (Expr)      │  Expr::Pipe { left: Command{...}, right: Command{...} }
 └────────┬─────────┘
@@ -244,7 +244,7 @@ fn expand_word(&mut self, word: &Word) -> Result<String> {
 
 **Example:** `"Hello $USER!"` with `$USER=alice`
 
-```
+```text
 Word([
   Literal("Hello "),
   Variable("USER"),
