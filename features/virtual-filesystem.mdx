@@ -1,0 +1,326 @@
+---
+title: 'Virtual Filesystem'
+description: 'In-memory Unix directory tree with optional host mounts'
+---
+
+Nash boots with a complete Unix directory structure entirely in RAM. No files exist on the host system unless explicitly mounted.
+
+## In-Memory VFS Structure
+
+At startup, Nash scaffolds a realistic filesystem tree:
+
+```
+/
+├── bin/         sbin/
+├── usr/
+│   ├── bin/     sbin/     local/bin/
+├── etc/
+│   ├── hostname            shells
+├── var/
+│   ├── log/     tmp/
+├── tmp/
+├── lib/         lib64/
+├── opt/
+├── home/
+│   └── <user>/
+│       ├── Desktop/        Documents/        Downloads/
+│       ├── .nashrc
+│       └── welcome.txt
+└── root/        proc/       dev/
+```
+
+<Note>
+All directories and files shown above exist only in memory. They disappear when Nash exits.
+</Note>
+
+## Boot-Time Scaffolding
+
+The VFS is initialized when the executor starts:
+
+```rust Executor initialization
+// src/runtime/executor.rs
+impl Executor {
+    pub fn new(config: ExecutorConfig, username: &str) -> Result<Self> {
+        let mut vfs = Vfs::new();
+        
+        // Create standard Unix directories
+        let home_dir = format!("/home/{}", username);
+        for dir in &[
+            "/bin", "/sbin", "/usr", "/usr/bin", "/usr/sbin",
+            "/usr/local", "/usr/local/bin", "/etc", "/var",
+            "/var/log", "/var/tmp", "/tmp", "/lib", "/lib64",
+            "/opt", "/root", "/proc", "/dev", home_dir.as_str(),
+        ] {
+            vfs.mkdir_p(dir)?;
+        }
+        
+        // User home subdirectories
+        for sub in &["Desktop", "Documents", "Downloads"] {
+            vfs.mkdir_p(&format!("{}/{}", home_dir, sub))?;
+        }
+        
+        // Skeleton files
+        vfs.write_str(&format!("{}/.nashrc", home_dir),
+            &format!("# ~/.nashrc\nexport USER={}\n", username))?;
+        vfs.write_str("/etc/hostname", "nash\n")?;
+        vfs.write_str("/etc/shells", "/bin/nash\n/bin/sh\n")?;
+        vfs.write_str(&format!("{}/welcome.txt", home_dir),
+            "Welcome to Nash!\nType 'help' to see available commands.\n")?;
+        
+        // ...
+    }
+}
+```
+
+<Info>
+The scaffolding creates a Unix environment that feels familiar to shell users, even though nothing touches the host disk.
+</Info>
+
+## VFS Data Structure
+
+Internally, the VFS stores nodes in a flat `HashMap` keyed by absolute path:
+
+```rust VFS internals
+// src/vfs/mod.rs
+pub struct Vfs {
+    nodes: HashMap<String, FsNode>,  // "/home/user/file.txt" -> FsNode
+    mounts: Vec<MountPoint>,         // Host directory overlays
+}
+
+// src/vfs/node.rs
+pub enum FsNode {
+    File(Vec<u8>),              // Raw bytes in memory
+    Directory(HashMap<String, ()>),  // Marker for type checking
+}
+```
+
+### Path Normalization
+
+All paths are normalized before lookup to resolve `.` and `..`:
+
+```rust Path normalization
+// src/vfs/path.rs
+impl VfsPath {
+    pub fn normalize(path: &str) -> String {
+        let mut components: Vec<&str> = Vec::new();
+        
+        for part in path.split('/') {
+            match part {
+                "" | "." => {}           // Skip
+                ".." => { components.pop(); }  // Go up
+                other => components.push(other),
+            }
+        }
+        
+        format!("/{}", components.join("/"))
+    }
+}
+```
+
+**Examples:**
+
+```rust
+VfsPath::normalize("/home/./user")        // "/home/user"
+VfsPath::normalize("/home/user/../other") // "/home/other"
+VfsPath::normalize("/./tmp/./file.txt")  // "/tmp/file.txt"
+```
+
+## File Operations
+
+All Nash commands use these VFS methods:
+
+### Reading Files
+
+```rust Read operation
+pub fn read(&self, path: &str) -> Result<Vec<u8>> {
+    let p = VfsPath::normalize(path);
+    
+    // Check in-memory nodes
+    if let Some(node) = self.nodes.get(&p) {
+        match node {
+            FsNode::File(data) => return Ok(data.clone()),
+            FsNode::Directory(_) => bail!("is a directory"),
+        }
+    }
+    
+    // Check host mounts
+    if let Some(mp) = self.find_mount(&p) {
+        let host_path = /* map VFS path to host */;
+        return std::fs::read(&host_path);
+    }
+    
+    bail!("no such file: {}", path)
+}
+```
+
+### Writing Files
+
+```rust Write operation
+pub fn write(&mut self, path: &str, data: Vec<u8>) -> Result<()> {
+    let p = VfsPath::normalize(path);
+    self.check_write_allowed(&p)?;  // Read-only mount check
+    
+    // Ensure parent directory exists
+    let parent = VfsPath::parent(&p);
+    if !self.is_dir(&parent) {
+        bail!("no such directory");
+    }
+    
+    // Try host mount first
+    if let Some(mp) = self.find_mount_mut(&p) {
+        let host_path = /* map to host */;
+        return std::fs::write(&host_path, &data);
+    }
+    
+    // Store in memory
+    self.nodes.insert(p, FsNode::File(data));
+    Ok(())
+}
+```
+
+### Creating Directories
+
+```rust
+// Create all parent directories
+pub fn mkdir_p(&mut self, path: &str) -> Result<()> {
+    let p = VfsPath::normalize(path);
+    let mut current = String::new();
+    
+    for component in p.split('/') {
+        if component.is_empty() {
+            current.push('/');
+            continue;
+        }
+        current = format!("{}/{}", current, component);
+        
+        if !self.nodes.contains_key(&current) {
+            self.nodes.insert(current.clone(), FsNode::Directory(HashMap::new()));
+        }
+    }
+    Ok(())
+}
+```
+
+### Listing Directories
+
+```rust
+pub fn list_dir(&self, path: &str) -> Result<Vec<DirEntry>> {
+    let p = VfsPath::normalize(path);
+    let prefix = format!("{}/", p);
+    let mut entries = Vec::new();
+    
+    // Scan in-memory nodes
+    for key in self.nodes.keys() {
+        if key.starts_with(&prefix) {
+            let name = key.strip_prefix(&prefix).unwrap();
+            if !name.contains('/') {  // Direct child only
+                entries.push(DirEntry { name, is_dir });
+            }
+        }
+    }
+    
+    // Merge host mount entries if present
+    if let Some(mp) = self.find_mount(&p) {
+        // ... read std::fs::read_dir and merge
+    }
+    
+    entries.sort();
+    Ok(entries)
+}
+```
+
+<Accordion title="Full list of VFS operations">
+- `exists(path)` — Check if path exists
+- `is_dir(path)` — Check if path is directory
+- `read(path)` — Read file as bytes
+- `read_to_string(path)` — Read file as UTF-8 string
+- `write(path, data)` — Overwrite or create file
+- `write_str(path, s)` — Write UTF-8 string
+- `append(path, data)` — Append to file
+- `mkdir(path)` — Create directory (parent must exist)
+- `mkdir_p(path)` — Create directory with parents
+- `touch(path)` — Create empty file if missing
+- `remove(path)` — Delete file or empty directory
+- `remove_recursive(path)` — Delete directory tree
+- `list_dir(path)` — List directory entries
+- `copy_file(src, dst)` — Copy file
+- `rename(src, dst)` — Move/rename file or directory
+</Accordion>
+
+## How It Differs From Real Filesystems
+
+| Feature | Real Filesystem | Nash VFS |
+|---------|----------------|----------|
+| **Persistence** | Survives reboot | Deleted on exit |
+| **Inodes** | Numeric IDs, hard links | Flat path-keyed map |
+| **Permissions** | User/group/mode bits | Not enforced |
+| **Timestamps** | mtime, ctime, atime | Not tracked |
+| **Block devices** | /dev nodes | Placeholder directories |
+| **Symlinks** | Resolved by kernel | Not implemented |
+| **Mount points** | Kernel managed | Manually registered overlays |
+
+<Warning>
+Nash does not implement:
+- Unix permissions (everything is readable/writable)
+- Symlinks or hard links
+- Device nodes (`/dev/null`, `/dev/random`)
+- File metadata (timestamps, ownership)
+</Warning>
+
+## Path Manipulation Helpers
+
+```rust Path utilities
+// src/vfs/path.rs
+impl VfsPath {
+    // Return parent directory
+    pub fn parent(path: &str) -> String {
+        // "/home/user/file.txt" -> "/home/user"
+    }
+    
+    // Return final component
+    pub fn basename(path: &str) -> String {
+        // "/home/user/file.txt" -> "file.txt"
+    }
+    
+    // Join base and relative path
+    pub fn join(base: &str, rel: &str) -> String {
+        // ("/home/user", "docs") -> "/home/user/docs"
+        // ("/home/user", "/tmp") -> "/tmp" (absolute overrides)
+    }
+}
+```
+
+## Interactive Example
+
+```bash Working with the VFS
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  welcome.txt
+
+user@nash:/home/user$ cat welcome.txt
+Welcome to Nash!
+Type 'help' to see available commands.
+
+user@nash:/home/user$ echo "Hello VFS" > test.txt
+
+user@nash:/home/user$ cat test.txt
+Hello VFS
+
+user@nash:/home/user$ mkdir -p projects/demo
+
+user@nash:/home/user$ tree projects
+projects
+└── demo
+
+user@nash:/home/user$ rm test.txt
+
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  projects/  welcome.txt
+```
+
+<Info>
+All changes above exist only in Nash's memory. Exiting the session discards everything not written to a mounted host directory.
+</Info>
+
+## Host Mount Integration
+
+To persist data or access host files, use explicit mounts. See [Host Mounts](/features/host-mounts) for details.

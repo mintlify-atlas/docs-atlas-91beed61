@@ -1,0 +1,406 @@
+---
+title: 'tree'
+description: 'Display directory structure as a visual tree'
+---
+
+## Syntax
+
+```bash
+tree [-a] [-L level] [directory]
+```
+
+## Description
+
+The `tree` command displays the directory structure in a visual tree format, making it easy to understand the hierarchy of files and directories. It recursively traverses directories and presents them with ASCII art connectors showing the relationships between files and folders.
+
+<Note>
+  Tree operates entirely within Nash's Virtual Filesystem (VFS). When viewing mounted host directories, it displays the host content through the VFS mount point.
+</Note>
+
+## Options
+
+<ParamField path="-a" type="flag">
+  Show hidden files and directories (those starting with `.`). By default, hidden entries are filtered out.
+</ParamField>
+
+<ParamField path="-L" type="number">
+  Limit the depth of directory traversal. For example, `-L 2` shows only two levels deep. Without this option, tree recurses through all subdirectories.
+  
+  **Syntax**: `-L N` where N is the maximum depth level.
+</ParamField>
+
+## Arguments
+
+<ParamField path="directory" type="string" optional>
+  The starting directory to display. Can be an absolute path or relative to the current working directory. If omitted, defaults to the current directory.
+</ParamField>
+
+## Behavior
+
+1. Displays the root directory path on the first line
+2. Recursively traverses all subdirectories (unless limited by `-L`)
+3. Uses box-drawing characters (`├──`, `└──`, `│`) to show hierarchy
+4. Appends `/` to directory names for visual distinction
+5. Filters hidden files/directories by default (unless `-a` is specified)
+6. Outputs summary line showing total directories and files counted
+
+## Examples
+
+### Basic tree from current directory
+
+```bash
+user@nash:/home/user$ tree
+/home/user
+├── Desktop/
+├── Documents/
+├── Downloads/
+└── welcome.txt
+
+3 directories, 1 file
+```
+
+### Tree of specific directory
+
+```bash
+user@nash:/home/user$ mkdir -p project/src/lib project/tests
+user@nash:/home/user$ tree project
+project
+├── src/
+│   └── lib/
+└── tests/
+
+3 directories, 0 files
+```
+
+### Limit depth with -L
+
+```bash
+user@nash:/home/user$ mkdir -p deep/level1/level2/level3/level4
+user@nash:/home/user$ tree -L 2 deep
+deep
+└── level1/
+    └── level2/
+
+2 directories, 0 files
+```
+
+### Show hidden files with -a
+
+```bash
+user@nash:/home/user$ tree -a
+/home/user
+├── .bashrc
+├── .nashrc
+├── Desktop/
+├── Documents/
+├── Downloads/
+└── welcome.txt
+
+3 directories, 3 files
+```
+
+### Combine -a and -L flags
+
+```bash
+user@nash:/home/user$ tree -a -L 1
+/home/user
+├── .bashrc
+├── .nashrc
+├── Desktop/
+├── Documents/
+├── Downloads/
+└── welcome.txt
+
+3 directories, 3 files
+```
+
+### Tree with files in subdirectories
+
+```bash
+user@nash:/home/user$ mkdir -p app/src app/tests
+user@nash:/home/user$ touch app/src/main.rs app/src/lib.rs app/tests/test.rs
+user@nash:/home/user$ tree app
+app
+├── src/
+│   ├── lib.rs
+│   └── main.rs
+└── tests/
+    └── test.rs
+
+2 directories, 3 files
+```
+
+### Tree from absolute path
+
+```bash
+user@nash:/home/user$ cd /
+user@nash:/$ tree -L 1 /home
+/home
+└── user/
+
+1 directory, 0 files
+```
+
+## Output Format
+
+Tree uses the following ASCII characters to draw the structure:
+
+- `├──` - Branch connector (not the last item)
+- `└──` - Final branch connector (last item)
+- `│` - Vertical line (continues branch)
+- `/` - Suffix for directories
+
+**Summary line format:**
+```
+N directory/directories, M file/files
+```
+
+## Use Cases
+
+### Verify project structure
+
+```bash
+user@nash:/home/user$ mkdir -p myapp/{src,tests,docs,config}
+user@nash:/home/user$ tree myapp
+myapp
+├── config/
+├── docs/
+├── src/
+└── tests/
+
+4 directories, 0 files
+```
+
+### Quick overview of nested content
+
+```bash
+user@nash:/home/user$ tree -L 2
+/home/user
+├── Desktop/
+├── Documents/
+│   ├── reports/
+│   └── notes/
+├── Downloads/
+└── welcome.txt
+
+5 directories, 1 file
+```
+
+### Documentation and README examples
+
+```bash
+user@nash:/home/user$ tree project > structure.txt
+user@nash:/home/user$ cat structure.txt
+project
+├── src/
+│   └── main.rs
+└── README.md
+
+1 directory, 2 files
+```
+
+### Compare before and after operations
+
+```bash
+user@nash:/home/user$ tree workspace
+workspace
+
+0 directories, 0 files
+
+user@nash:/home/user$ mkdir -p workspace/src workspace/build
+user@nash:/home/user$ tree workspace
+workspace
+├── build/
+└── src/
+
+2 directories, 0 files
+```
+
+## VFS Integration
+
+### Viewing mounted directories
+
+Tree displays the content of mounted host directories:
+
+```bash
+# Start Nash with a mount
+$ nash --bind ./myproject:/project
+
+user@nash:/home/user$ tree /project
+/project
+├── src/
+│   ├── main.rs
+│   └── lib.rs
+├── tests/
+│   └── test.rs
+└── README.md
+
+2 directories, 4 files
+```
+
+### Multiple mount points
+
+```bash
+$ nash --bind ./src:/app/src --bind ./docs:/app/docs
+
+user@nash:/home/user$ tree /app
+/app
+├── docs/
+│   └── guide.md
+└── src/
+    └── main.rs
+
+2 directories, 2 files
+```
+
+### Read-only mounts
+
+Tree works identically on read-only mounts:
+
+```bash
+$ nash --bind-ro ./config:/config
+
+user@nash:/home/user$ tree /config
+/config
+├── app.json
+└── settings/
+    └── dev.json
+
+1 directory, 2 files
+```
+
+## Error Handling
+
+### Non-existent directory
+
+If the specified directory doesn't exist, tree shows an empty result:
+
+```bash
+user@nash:/home/user$ tree nonexistent
+nonexistent
+
+0 directories, 0 files
+```
+
+<Note>
+  Tree doesn't produce an error for non-existent paths; it simply shows zero entries.
+</Note>
+
+### Permission issues in mounted directories
+
+If a mounted directory has host-level permission issues, those entries may be skipped silently.
+
+## Combining with Other Commands
+
+### Save tree output to file
+
+```bash
+user@nash:/home/user$ tree project > project-structure.txt
+user@nash:/home/user$ cat project-structure.txt
+project
+├── src/
+│   └── main.rs
+└── tests/
+
+2 directories, 1 file
+```
+
+### Compare with find
+
+```bash
+user@nash:/home/user$ tree -a project
+project
+├── .gitignore
+├── src/
+│   └── main.rs
+└── tests/
+
+2 directories, 2 files
+
+user@nash:/home/user$ find project -name ".*"
+project/.gitignore
+```
+
+### Verify mkdir -p results
+
+```bash
+user@nash:/home/user$ mkdir -p a/b/c a/b/d a/e
+user@nash:/home/user$ tree a
+a
+├── b/
+│   ├── c/
+│   └── d/
+└── e/
+
+4 directories, 0 files
+```
+
+### Use with grep to filter
+
+```bash
+user@nash:/home/user$ tree | grep ".txt"
+└── welcome.txt
+```
+
+## Exit Codes
+
+- **0** - Success: tree displayed successfully
+
+## Related Commands
+
+- [`ls`](/commands/ls) - List directory contents in flat format
+- [`find`](/commands/find) - Search for files recursively
+- [`cd`](/commands/cd) - Change to a directory before running tree
+- [`pwd`](/commands/pwd) - Show current directory (tree's default starting point)
+- [`mkdir`](/commands/mkdir) - Create directory structures to visualize
+
+## Implementation Details
+
+The `tree` command is implemented in `/home/daytona/workspace/source/src/builtins/tree.rs:9-110`. Key implementation notes:
+
+- Recursively traverses directories using `vfs.list_dir()`
+- Uses a depth counter to implement `-L` max depth limiting
+- Filters entries starting with `.` unless `-a` flag is provided
+- Tracks directory and file counts separately for summary
+- Uses `tree_recursive()` helper function for depth-first traversal
+- Builds ASCII tree structure with appropriate connectors
+- Handles the "last item" case differently (uses `└──` instead of `├──`)
+- Appends `/` suffix to directory names for visual clarity
+
+## Performance Considerations
+
+<Warning>
+  On very large directory trees without `-L` limiting, tree may take significant time and produce extensive output. Use `-L` to limit depth when exploring large hierarchies.
+</Warning>
+
+### Best practices for large trees
+
+```bash
+# Start with limited depth
+user@nash:/$ tree -L 2
+
+# Gradually increase if needed
+user@nash:/$ tree -L 3
+
+# Filter to specific subtree
+user@nash:/$ tree /home/user/projects
+```
+
+## Comparison to Traditional Unix tree
+
+Nash's `tree` implements core functionality:
+
+| Feature | Nash tree | Unix tree |
+|---------|-----------|------------|
+| `-a` all files | ✓ Supported | ✓ Supported |
+| `-L` max depth | ✓ Supported | ✓ Supported |
+| `-d` dirs only | ✗ Not supported | ✓ Supported |
+| `-f` full path | ✗ Not supported | ✓ Supported |
+| `-P` pattern | ✗ Not supported | ✓ Supported |
+| `--du` disk usage | ✗ Not supported | ✓ Supported |
+| Colored output | ✗ Not supported | ✓ Supported |
+| File permissions | ✗ Not supported | ✓ Supported |
+
+<Note>
+  Nash focuses on the essential tree visualization features. Advanced filtering and statistics are available through other commands like `find` and `stat`.
+</Note>

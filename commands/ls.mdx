@@ -1,0 +1,350 @@
+---
+title: ls
+description: List directory contents in the virtual filesystem
+icon: list
+---
+
+## Syntax
+
+```bash
+ls [OPTIONS] [PATH...]
+```
+
+## Description
+
+The `ls` command lists files and directories within Nash's virtual filesystem. Without arguments, it lists the contents of the current working directory. It supports common flags for showing hidden files and detailed information.
+
+## Options
+
+<ParamField path="-a" type="flag">
+  Show hidden files (files starting with `.`)
+</ParamField>
+
+<ParamField path="-l" type="flag">
+  Use long listing format (show permissions, size, and name)
+</ParamField>
+
+<ParamField path="-al" type="flag">
+  Combine flags: long format with hidden files
+</ParamField>
+
+## Parameters
+
+<ParamField path="PATH" type="string" optional>
+  One or more directories or files to list. If omitted, lists current directory. Supports multiple paths.
+</ParamField>
+
+## Behavior
+
+- **Default mode**: Lists visible files in current directory, one per line
+- **Directories**: Appended with `/` in short format
+- **Hidden files**: Files starting with `.` are hidden unless `-a` is used
+- **Long format**: Shows permissions, size, and name
+- **Multiple paths**: Lists each path with headers
+- **Flag combining**: Flags can be combined (e.g., `-la`, `-al`)
+
+## Examples
+
+### List current directory
+
+```bash
+ls
+```
+
+```
+Desktop/
+Documents/
+Downloads/
+welcome.txt
+```
+
+### List with hidden files
+
+```bash
+ls -a
+```
+
+```
+./
+../
+.bashrc
+.nashrc
+Desktop/
+Documents/
+Downloads/
+welcome.txt
+```
+
+### Long format listing
+
+```bash
+ls -l
+```
+
+```
+drwxr-xr-x  Desktop
+drwxr-xr-x  Documents
+drwxr-xr-x  Downloads
+-rw-r--r--       156  welcome.txt
+```
+
+### Long format with hidden files
+
+```bash
+ls -la
+```
+
+```
+drwxr-xr-x  .
+drwxr-xr-x  ..
+-rw-r--r--       245  .bashrc
+-rw-r--r--       128  .nashrc
+drwxr-xr-x  Desktop
+drwxr-xr-x  Documents
+drwxr-xr-x  Downloads
+-rw-r--r--       156  welcome.txt
+```
+
+### List specific directory
+
+```bash
+ls /home/user/Documents
+```
+
+```
+report.txt
+notes.md
+spreadsheet.csv
+```
+
+### List multiple directories
+
+```bash
+ls /tmp /home/user
+```
+
+```
+/tmp:
+cache/
+temp_file.txt
+
+/home/user:
+Desktop/
+Documents/
+Downloads/
+welcome.txt
+```
+
+### List a single file
+
+```bash
+ls config.json
+```
+
+```
+/home/user/config.json
+```
+
+## Output Format
+
+### Short Format (default)
+
+- Directories shown with trailing `/`
+- One entry per line
+- No size or permission information
+
+### Long Format (`-l`)
+
+```
+-rw-r--r--       1234  filename.txt
+drwxr-xr-x            dirname
+```
+
+- **Column 1**: Permissions (`d` for directory, `-` for file)
+- **Column 2**: Size in bytes (right-aligned, only for files)
+- **Column 3**: Filename
+
+Directories show permissions but no size (0 bytes).
+
+## Error Handling
+
+### Directory doesn't exist
+
+```bash
+ls /nonexistent
+```
+
+```
+ls: cannot access '/nonexistent': No such file or directory
+```
+
+Exit code: `1`
+
+### Permission denied (read-only mount)
+
+If a directory cannot be read, `ls` will return an appropriate error from the VFS layer.
+
+## Implementation Details
+
+- Source: `src/builtins/ls.rs`
+- Uses `vfs.list_dir()` to enumerate directory entries
+- Checks `vfs.is_dir()` to determine entry types
+- Reads file size using `vfs.read()` for long format
+- Filters entries starting with `.` unless `-a` is specified
+- Supports flag combining (e.g., `-la` parsed as `-l` + `-a`)
+
+<Note>
+File sizes are displayed in bytes only. There's no `-h` (human-readable) flag for KB/MB/GB formatting.
+</Note>
+
+## Differences from Unix ls
+
+| Feature | Unix ls | Nash ls |
+|---------|---------|----------|
+| List files | ✅ Supported | ✅ Supported |
+| `-a` (all/hidden) | ✅ Supported | ✅ Supported |
+| `-l` (long format) | ✅ Supported | ✅ Supported |
+| `-h` (human-readable) | ✅ Supported | ❌ Not supported |
+| `-R` (recursive) | ✅ Supported | ❌ Not supported |
+| `-t` (sort by time) | ✅ Supported | ❌ Not supported |
+| `-S` (sort by size) | ✅ Supported | ❌ Not supported |
+| `-r` (reverse) | ✅ Supported | ❌ Not supported |
+| Colors | ✅ Optional | ❌ No colors |
+| Timestamps | ✅ Shown | ❌ Not tracked |
+| Sorting | Multiple options | Unsorted |
+
+## Use Cases
+
+### Check directory contents
+```bash
+ls
+```
+
+### Find hidden configuration files
+```bash
+ls -a | grep "^\."
+```
+
+### Check file sizes
+```bash
+ls -l | grep -v "^d"
+```
+
+### List all subdirectories
+```bash
+ls -l | grep "^d"
+```
+
+### Verify file creation
+```bash
+touch newfile.txt
+ls -l newfile.txt
+```
+
+### List mounted directories
+```bash
+# nash --bind ./data:/data
+ls /data
+```
+
+## Common Patterns
+
+### Count files in directory
+```bash
+ls | wc -l
+```
+
+### Find largest files
+```bash
+ls -l | sort -k2 -n
+```
+
+### List only directories
+```bash
+ls -l | grep "^d" | cut -d' ' -f3
+```
+
+### Check if directory is empty
+```bash
+if test $(ls | wc -l) -eq 0; then
+  echo "Directory is empty"
+fi
+```
+
+### List files recursively (using find)
+```bash
+find . -type f
+```
+
+### Create directory listing for documentation
+```bash
+ls -la > directory_listing.txt
+```
+
+## Working with Pipes
+
+### Filter by extension
+```bash
+ls | grep "\.txt$"
+```
+
+### Process each file
+```bash
+ls | while read file; do
+  echo "Processing: $file"
+  cat "$file" | wc -l
+done
+```
+
+### Find specific files
+```bash
+ls -a | grep "config"
+```
+
+## Display Format Examples
+
+### Short format
+```bash
+user@nash:/home/user$ ls
+Desktop/
+Documents/
+Downloads/
+welcome.txt
+```
+
+### Long format for files
+```bash
+user@nash:/home/user$ ls -l
+-rw-r--r--       156  welcome.txt
+-rw-r--r--      2048  config.json
+-rw-r--r--       512  notes.md
+```
+
+### Long format for directories
+```bash
+user@nash:/home/user$ ls -l /
+drwxr-xr-x  bin
+drwxr-xr-x  etc
+drwxr-xr-x  home
+drwxr-xr-x  tmp
+drwxr-xr-x  usr
+drwxr-xr-x  var
+```
+
+### Mixed content
+```bash
+user@nash:/home/user$ ls -l
+drwxr-xr-x  Desktop
+drwxr-xr-x  Documents
+-rw-r--r--       156  welcome.txt
+-rw-r--r--      2048  config.json
+```
+
+## Related Commands
+
+- [`tree`](/commands/tree) - Recursive directory tree view
+- [`find`](/commands/find) - Search for files
+- [`stat`](/commands/stat) - Detailed file information
+- [`file`](/commands/file) - Determine file type
+- [`cd`](/commands/cd) - Change directory
+- [`pwd`](/commands/pwd) - Print working directory

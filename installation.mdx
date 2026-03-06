@@ -1,0 +1,247 @@
+---
+title: Installation
+description: Learn how to install Nash on your system and verify the installation.
+---
+
+## Prerequisites
+
+Nash is written in Rust and requires the Rust toolchain to build from source.
+
+### Install Rust
+
+If you don't have Rust installed, install it using rustup:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+After installation, restart your terminal or run:
+
+```bash
+source $HOME/.cargo/env
+```
+
+### Verify Rust Installation
+
+Check that you have Rust 1.75 or later:
+
+```bash
+rustc --version
+```
+
+<Info>
+  Nash requires Rust 1.75+ due to modern language features and dependencies.
+</Info>
+
+## Build Nash from Source
+
+Nash is currently distributed as source code. Follow these steps to build it:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/sammwyy/nash
+    cd nash
+    ```
+  </Step>
+
+  <Step title="Build the release binary">
+    ```bash
+    cargo build --release
+    ```
+
+    This compiles Nash with optimizations enabled. The build process typically takes 1-3 minutes depending on your system.
+
+    <Note>
+      The `--release` flag is important for performance. Debug builds are significantly slower.
+    </Note>
+  </Step>
+
+  <Step title="Locate the binary">
+    After building, the binary will be at:
+
+    ```bash
+    target/release/nash
+    ```
+
+    You can run it directly from this location:
+
+    ```bash
+    ./target/release/nash
+    ```
+  </Step>
+
+  <Step title="(Optional) Install system-wide">
+    To make Nash available from anywhere, copy it to a directory in your PATH:
+
+    ```bash
+    sudo cp target/release/nash /usr/local/bin/
+    ```
+
+    Or add to your user bin directory:
+
+    ```bash
+    mkdir -p ~/.local/bin
+    cp target/release/nash ~/.local/bin/
+    # Add ~/.local/bin to your PATH if not already there
+    export PATH="$HOME/.local/bin:$PATH"
+    ```
+  </Step>
+</Steps>
+
+## Verify Installation
+
+Test that Nash is working correctly:
+
+### Check version
+
+```bash
+nash --version
+```
+
+You should see:
+
+```
+nash 0.1.0
+```
+
+### Run interactive REPL
+
+Start Nash in interactive mode:
+
+```bash
+nash
+```
+
+You should see the welcome banner:
+
+```
+Nash — Not A Shell  │  logged in as user  │  type help or Ctrl-D to exit
+
+user@nash:/home/user$
+```
+
+### Test basic commands
+
+Try some commands in the REPL:
+
+```bash
+user@nash:/home/user$ pwd
+/home/user
+
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  welcome.txt
+
+user@nash:/home/user$ cat welcome.txt
+# Content of welcome.txt appears here
+
+user@nash:/home/user$ echo "Nash is working!" | grep working
+Nash is working!
+```
+
+Exit Nash with `Ctrl-D` or by typing `exit`.
+
+## Dependencies
+
+Nash has minimal runtime dependencies. All dependencies are automatically handled by Cargo during build:
+
+| Dependency | Version | Purpose |
+|------------|---------|----------|
+| **rustyline** | 14.0 | REPL and readline functionality |
+| **clap** | 4.0 | CLI argument parsing |
+| **anyhow** | 1.0 | Error handling |
+| **thiserror** | 1.0 | Error type derivation |
+| **indexmap** | 2.0 | Ordered environment variables |
+
+<Info>
+  No system dependencies are required at runtime. Nash is a fully self-contained binary.
+</Info>
+
+## Build Profile
+
+The release build uses these optimizations (from `Cargo.toml`):
+
+```toml
+[profile.release]
+opt-level = 3      # Maximum optimization
+lto = true         # Link-time optimization
+```
+
+These settings produce a highly optimized binary suitable for production use.
+
+## Troubleshooting
+
+### Build fails with "cannot find crate"
+
+Ensure you have a stable internet connection. Cargo needs to download dependencies:
+
+```bash
+cargo clean
+cargo build --release
+```
+
+### "error: linker `cc` not found"
+
+You need a C compiler for linking. Install build tools:
+
+<CodeGroup>
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install build-essential
+```
+
+```bash Fedora/RHEL
+sudo dnf install gcc
+```
+
+```bash macOS
+xcode-select --install
+```
+</CodeGroup>
+
+### Binary is too large
+
+You can strip debug symbols to reduce size:
+
+```bash
+strip target/release/nash
+```
+
+### Permission denied when installing
+
+If `sudo cp` to `/usr/local/bin/` fails, use the user bin directory instead:
+
+```bash
+mkdir -p ~/.local/bin
+cp target/release/nash ~/.local/bin/
+```
+
+Then add to your shell's RC file (`~/.bashrc`, `~/.zshrc`, etc.):
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+## Uninstalling
+
+To remove Nash:
+
+```bash
+# If installed to /usr/local/bin
+sudo rm /usr/local/bin/nash
+
+# If installed to ~/.local/bin
+rm ~/.local/bin/nash
+
+# Remove the source directory if desired
+cd ..
+rm -rf nash
+```
+
+## Next Steps
+
+Now that Nash is installed, continue to the quickstart guide to learn how to use it:
+
+<Card title="Quickstart Tutorial" icon="rocket" href="/quickstart">
+  Get started with hands-on examples and learn Nash basics
+</Card>

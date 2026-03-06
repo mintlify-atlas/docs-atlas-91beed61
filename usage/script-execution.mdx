@@ -1,0 +1,422 @@
+---
+title: Script Execution
+description: Running shell scripts and one-shot commands with Nash
+---
+
+## Running Script Files
+
+Execute a shell script by passing it as a positional argument:
+
+```bash
+nash script.sh
+```
+
+Nash reads the script from the **host filesystem** (not the VFS), parses it line-by-line, and executes each command in sequence.
+
+### Basic Script Example
+
+Create a file `hello.sh`:
+
+```bash
+#!/usr/bin/env nash
+
+echo "Starting script..."
+mkdir -p /tmp/test
+cd /tmp/test
+echo "Hello from Nash!" > greeting.txt
+cat greeting.txt
+ls -l
+```
+
+Run it:
+
+```bash
+nash hello.sh
+```
+
+Output:
+
+```
+Starting script...
+Hello from Nash!
+-rw-r--r-- greeting.txt 18 bytes
+```
+
+<Note>
+Scripts execute inside Nash's sandboxed VFS environment. They cannot access host files unless explicitly mounted with `--bind`.
+</Note>
+
+## Shebang Handling
+
+Nash automatically **ignores shebang lines** (lines starting with `#!`) on line 1 of any script:
+
+```bash
+#!/usr/bin/env nash
+echo "This works fine"
+```
+
+The shebang is skipped during execution. This means you can make scripts executable and run them directly:
+
+```bash
+chmod +x script.sh
+./script.sh  # Still runs with nash if called with nash
+```
+
+<Warning>
+Making scripts executable and running them with `./script.sh` invokes the host shell interpreter specified in the shebang. To run with Nash, always use `nash script.sh`.
+</Warning>
+
+## One-Shot Commands (`-c`)
+
+Execute a single command string and exit using the `-c` flag:
+
+```bash
+nash -c "echo hello | grep hello"
+```
+
+Output:
+
+```
+hello
+```
+
+This is identical to bash's `-c` behavior.
+
+### Complex One-Liners
+
+You can use the full Nash syntax in `-c` mode:
+
+<CodeGroup>
+```bash Pipes and redirections
+nash -c "echo 'apple\nbanana\napple' | sort | uniq -c"
+```
+
+```bash Command chaining
+nash -c "mkdir /tmp/test && cd /tmp/test && pwd"
+```
+
+```bash Conditional execution
+nash -c "test -f /missing || echo 'File not found'"
+```
+
+```bash Variable expansion
+nash -c "echo \"User: \$USER, Home: \$HOME\""
+```
+</CodeGroup>
+
+### Quoting in `-c` Mode
+
+Be mindful of shell quoting when using `-c` from bash:
+
+<Tabs>
+  <Tab title="Correct">
+    ```bash
+    nash -c 'echo $USER'           # Single quotes: Nash expands $USER
+    nash -c "echo \$USER"          # Escaped $: Nash expands $USER
+    nash -c "echo hello | grep hi" # Pipe preserved for Nash
+    ```
+  </Tab>
+  <Tab title="Incorrect">
+    ```bash
+    nash -c "echo $USER"           # Host bash expands $USER before Nash sees it
+    nash -c echo hello             # -c expects a single argument
+    ```
+  </Tab>
+</Tabs>
+
+## Reading from Stdin (`-s`)
+
+Use the `-s` flag to read commands from stdin line-by-line:
+
+```bash
+cat commands.txt | nash -s
+```
+
+or
+
+```bash
+nash -s < commands.txt
+```
+
+### Example: Batch Processing
+
+Create `commands.txt`:
+
+```
+mkdir -p /tmp/batch
+echo "Processing file 1" > /tmp/batch/file1.txt
+echo "Processing file 2" > /tmp/batch/file2.txt
+ls /tmp/batch
+cat /tmp/batch/file1.txt
+```
+
+Execute:
+
+```bash
+nash -s < commands.txt
+```
+
+Output:
+
+```
+file1.txt  file2.txt
+Processing file 1
+```
+
+### Heredoc Input
+
+Combine `-s` with heredocs for inline script execution:
+
+```bash
+nash -s <<'EOF'
+echo "Starting batch job"
+mkdir -p /tmp/work
+cd /tmp/work
+echo "data" > input.txt
+cat input.txt | grep data
+EOF
+```
+
+<Note>
+When using `-s`, Nash reads stdin regardless of whether it's a TTY. Combine with `-i` if you want interactive mode after stdin is exhausted (though this is rare).
+</Note>
+
+## Shell Flags for Scripts
+
+Nash supports bash-compatible shell flags that modify script execution behavior:
+
+### Exit on Error (`-e`)
+
+Stop execution immediately if any command returns non-zero:
+
+```bash
+nash -e script.sh
+```
+
+Example `script.sh`:
+
+```bash
+echo "Step 1"
+false              # This fails
+echo "Step 2"      # NEVER executed with -e
+```
+
+With `-e`:
+
+```bash
+nash -e script.sh
+# Output:
+# Step 1
+# nash: errexit: command exited with status 1
+```
+
+Without `-e`:
+
+```bash
+nash script.sh
+# Output:
+# Step 1
+# Step 2
+```
+
+### Undefined Variable Errors (`-u`)
+
+Treat references to unset variables as errors:
+
+```bash
+nash -u script.sh
+```
+
+Example:
+
+```bash
+echo "User: $USER"      # OK: $USER is set
+echo "Missing: $FOOBAR" # ERROR with -u: FOOBAR not set
+```
+
+### Trace Execution (`-x`)
+
+Print each command to stderr before executing (set -x):
+
+```bash
+nash -x script.sh
+```
+
+Example script:
+
+```bash
+echo "hello"
+mkdir /tmp/test
+```
+
+Output with `-x`:
+
+```
++ echo "hello"
+hello
++ mkdir /tmp/test
+```
+
+### Verbose Input (`-v`)
+
+Print each line as it's read:
+
+```bash
+nash -v script.sh
+```
+
+This shows the raw input before any parsing or execution.
+
+### Combining Flags
+
+Flags can be combined for robust script execution:
+
+```bash
+nash -eux script.sh  # errexit + nounset + xtrace
+```
+
+This is equivalent to the common bash pattern:
+
+```bash
+set -eux
+```
+
+## Script Examples
+
+### Data Processing Pipeline
+
+`process.sh`:
+
+```bash
+#!/usr/bin/env nash
+
+# Generate sample data
+echo "apple" > /tmp/fruits.txt
+echo "banana" >> /tmp/fruits.txt
+echo "apple" >> /tmp/fruits.txt
+echo "cherry" >> /tmp/fruits.txt
+
+# Process: sort, dedupe, count
+cat /tmp/fruits.txt | sort | uniq -c
+
+# Find specific items
+grep "apple" /tmp/fruits.txt | wc -l
+```
+
+Run:
+
+```bash
+nash process.sh
+```
+
+### Conditional Logic
+
+`check.sh`:
+
+```bash
+test -f /etc/hostname && echo "Hostname file exists" || echo "Missing"
+test -d /home/user && cd /home/user && pwd
+test -z "$CUSTOM_VAR" && echo "CUSTOM_VAR is not set"
+```
+
+Run with environment override:
+
+```bash
+nash -E CUSTOM_VAR=value check.sh
+```
+
+### Working with Host Files
+
+`analyze.sh`:
+
+```bash
+#!/usr/bin/env nash
+
+# Access host directory via mount
+cd /data
+find . -name "*.txt" -type f
+cat report.txt | grep ERROR | wc -l
+```
+
+Run with mounted host directory:
+
+```bash
+nash --bind ./project-data:/data analyze.sh
+```
+
+<Warning>
+Without a `--bind` mount, scripts cannot access host filesystem paths. The script will operate entirely within the VFS sandbox.
+</Warning>
+
+## Script Error Handling
+
+### Parse Errors
+
+If a line has invalid syntax, Nash reports the error and continues (unless `-e` is set):
+
+```bash
+echo "valid"
+this is | bad syntax
+echo "continues without -e"
+```
+
+Output:
+
+```
+valid
+nash: parse error: unexpected token
+continues without -e
+```
+
+With `-e`:
+
+```bash
+nash -e script.sh
+# Output:
+# valid
+# nash: parse error: unexpected token
+# nash: errexit: parse error
+```
+
+### Exit Codes
+
+Scripts return the exit code of the last executed command:
+
+```bash
+nash script.sh
+echo $?  # Host shell exit code from nash
+```
+
+## Advanced Usage
+
+### Login Shell Scripts
+
+Combine `-l` with script execution to source rc files first:
+
+```bash
+nash -l script.sh
+```
+
+This sources `/etc/profile` and `~/.nashrc` (from VFS) before running the script.
+
+### Custom RC with Script
+
+```bash
+nash --rcfile ./setup.nashrc script.sh
+```
+
+### Environment Injection
+
+Pass environment variables to scripts:
+
+```bash
+nash -E DEBUG=true -E API_URL=http://localhost script.sh
+```
+
+The script can access `$DEBUG` and `$API_URL`.
+
+## See Also
+
+- [Interactive Mode](/usage/interactive-mode) - Using the Nash REPL
+- [CLI Flags](/usage/cli-flags) - All available command-line flags
+- [RC Files](/usage/rc-files) - Initialization scripts

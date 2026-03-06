@@ -1,0 +1,238 @@
+---
+title: grep
+description: Search for patterns in text
+---
+
+## Syntax
+
+```bash
+grep [OPTIONS] PATTERN [FILE...]
+```
+
+## Description
+
+The `grep` command searches for lines containing a specified pattern. It reads from files or standard input and outputs only matching lines. This is one of the most powerful text filtering tools in Unix-like systems.
+
+Nash's `grep` performs substring matching (not regex) and operates entirely within the virtual filesystem.
+
+## Options
+
+<ParamField path="PATTERN" type="string" required>
+  The text pattern to search for. Performs literal substring matching.
+</ParamField>
+
+<ParamField path="-v" type="flag">
+  Invert match. Show lines that do NOT contain the pattern.
+  
+  Alias: `--invert-match`
+</ParamField>
+
+<ParamField path="-i" type="flag">
+  Ignore case distinctions. Makes the search case-insensitive.
+  
+  Alias: `--ignore-case`
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Prefix each output line with its line number.
+  
+  Alias: `--line-number`
+</ParamField>
+
+## Examples
+
+### Basic pattern search
+
+```bash
+echo -e "apple\nbanana\napricot\ncherry" | grep ap
+```
+
+<CodeGroup>
+```bash Output
+apple
+apricot
+```
+</CodeGroup>
+
+### Case-insensitive search
+
+```bash
+echo -e "Apple\nBANANA\napricot" | grep -i apple
+```
+
+<CodeGroup>
+```bash Output
+Apple
+apricot
+```
+</CodeGroup>
+
+### Invert match
+
+```bash
+echo -e "keep\nremove\nkeep" | grep -v remove
+```
+
+<CodeGroup>
+```bash Output
+keep
+keep
+```
+</CodeGroup>
+
+### Show line numbers
+
+```bash
+echo -e "line one\nline two\nline three" | grep -n line
+```
+
+<CodeGroup>
+```bash Output
+1:line one
+2:line two
+3:line three
+```
+</CodeGroup>
+
+### Search in files
+
+```bash
+echo -e "error: failed\nwarning: slow\ninfo: done" > log.txt
+grep error log.txt
+```
+
+<CodeGroup>
+```bash Output
+error: failed
+```
+</CodeGroup>
+
+### Combine flags
+
+```bash
+echo -e "ERROR\nWarning\nerror" | grep -in error
+```
+
+<CodeGroup>
+```bash Output
+1:ERROR
+3:error
+```
+</CodeGroup>
+
+## Pipeline Examples
+
+### Filter process output
+
+```bash
+env | grep PATH
+```
+
+<CodeGroup>
+```bash Output
+PATH=/usr/local/bin:/usr/bin:/bin
+```
+</CodeGroup>
+
+### Multi-stage filtering
+
+```bash
+ls -la | grep txt | grep -v test
+```
+
+Shows `.txt` files but excludes those with "test" in the name.
+
+### Count matches
+
+```bash
+cat access.log | grep "404" | wc -l
+```
+
+Counts how many lines contain "404".
+
+### Extract specific records
+
+```bash
+cat users.csv | grep "@gmail.com"
+```
+
+Finds all rows with Gmail addresses.
+
+## Practical Use Cases
+
+### Log analysis
+
+```bash
+cat server.log | grep -i error | grep -n "database"
+```
+
+Find all error messages related to database, with line numbers.
+
+### Configuration validation
+
+```bash
+grep "DEBUG=true" .env && echo "Debug mode enabled"
+```
+
+### Filter file listings
+
+```bash
+ls | grep "\.js$" | grep -v test
+```
+
+List JavaScript files, excluding test files.
+
+### Quick content check
+
+```bash
+grep -i "todo" *.txt || echo "No TODOs found"
+```
+
+### Extract data fields
+
+```bash
+cat data.csv | grep "active" | cut -d, -f1,3
+```
+
+Find active records and extract specific columns.
+
+## Exit Status
+
+- **0** - At least one match found
+- **1** - No matches found
+
+<Note>
+Nash's `grep` uses substring matching, not regular expressions. The pattern `"a.b"` matches the literal string "a.b", not "a" followed by any character and "b".
+</Note>
+
+## Tips
+
+### Multiple patterns
+
+Use multiple `grep` commands in a pipeline:
+
+```bash
+cat file.txt | grep pattern1 | grep pattern2
+```
+
+### OR logic with invert
+
+```bash
+# Show lines that don't contain "skip" or "ignore"
+cat file.txt | grep -v skip | grep -v ignore
+```
+
+### Debugging pipelines
+
+```bash
+cat data.txt | grep -n error
+```
+
+Line numbers help identify where matches occur in the original file.
+
+## Related Commands
+
+- [`sed`](/commands/sed) - Stream editor for text transformation
+- [`cut`](/commands/cut) - Extract fields from lines
+- [`sort`](/commands/sort) - Sort lines of text
+- [`uniq`](/commands/uniq) - Filter duplicate lines

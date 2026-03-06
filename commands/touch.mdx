@@ -1,0 +1,241 @@
+---
+title: touch
+description: Create empty files in the virtual filesystem
+icon: file-plus
+---
+
+## Syntax
+
+```bash
+touch FILE...
+```
+
+## Description
+
+The `touch` command creates empty files in Nash's virtual filesystem. If a file already exists, the command succeeds silently without modifying the file (unlike Unix `touch`, which updates timestamps).
+
+<Note>
+Nash's `touch` is a simplified version that only creates empty files. It doesn't update timestamps because the VFS doesn't track file modification times.
+</Note>
+
+## Parameters
+
+<ParamField path="FILE" type="string" required>
+  One or more file paths to create. Can be relative or absolute. Supports multiple files in a single command.
+</ParamField>
+
+## Behavior
+
+- **Creates empty files**: New files are created with zero bytes
+- **Multiple files**: Can create multiple files in one command
+- **Existing files**: If file exists, no error is raised (idempotent)
+- **Flag handling**: Arguments starting with `-` are silently ignored
+- **No output**: Success produces no output (silent operation)
+
+## Examples
+
+### Create a single file
+
+```bash
+touch newfile.txt
+```
+
+### Create multiple files
+
+```bash
+touch file1.txt file2.txt file3.txt
+```
+
+### Create files in different directories
+
+```bash
+touch /home/user/notes.txt /tmp/cache.txt
+```
+
+### Create placeholder files
+
+```bash
+touch README.md LICENSE .gitignore
+```
+
+### Create files with special names
+
+```bash
+touch "file with spaces.txt"
+touch .hidden_file
+```
+
+### Verify file creation
+
+```bash
+touch test.txt
+ls -l test.txt
+```
+
+```
+-rw-r--r--         0  test.txt
+```
+
+### Create structure for a project
+
+```bash
+mkdir -p src tests docs
+touch src/main.rs tests/test.rs docs/README.md
+tree
+```
+
+```
+.
+├── docs/
+│   └── README.md
+├── src/
+│   └── main.rs
+└── tests/
+    └── test.rs
+```
+
+## Error Handling
+
+### Parent directory doesn't exist
+
+```bash
+touch /nonexistent/file.txt
+```
+
+Returns an error from the VFS layer indicating the parent directory doesn't exist.
+
+### Invalid path
+
+```bash
+touch ""
+```
+
+May fail with a VFS error for invalid paths.
+
+### Read-only filesystem
+
+```bash
+# If /data is mounted with --bind-ro
+touch /data/newfile.txt
+```
+
+Fails with a permission error from the VFS layer.
+
+## Implementation Details
+
+- Source: `src/builtins/touch.rs`
+- Uses `vfs.touch()` to create files
+- Iterates through all non-flag arguments
+- Arguments starting with `-` are filtered out but not validated
+- No timestamp updates (VFS doesn't track timestamps)
+- Creates empty files (zero bytes)
+
+<Note>
+Unlike Unix `touch`, Nash's version doesn't support timestamp-related flags like `-t`, `-d`, `-a`, or `-m` because the VFS doesn't maintain file timestamps.
+</Note>
+
+## Differences from Unix touch
+
+| Feature | Unix touch | Nash touch |
+|---------|-----------|------------|
+| Create empty file | ✅ Supported | ✅ Supported |
+| Multiple files | ✅ Supported | ✅ Supported |
+| Update access time | ✅ `-a` flag | ❌ No timestamps |
+| Update modification time | ✅ `-m` flag | ❌ No timestamps |
+| Set specific time | ✅ `-t`, `-d` | ❌ No timestamps |
+| No-create mode | ✅ `-c` flag | ❌ Not supported |
+| Reference file | ✅ `-r` flag | ❌ Not supported |
+| Existing files | Updates time | No change |
+
+## Use Cases
+
+### Initialize project files
+```bash
+touch index.html style.css script.js
+```
+
+### Create placeholder for later
+```bash
+touch TODO.txt
+echo "- Implement feature X" >> TODO.txt
+```
+
+### Prepare test environment
+```bash
+mkdir test_data
+touch test_data/input1.txt test_data/input2.txt test_data/input3.txt
+```
+
+### Create configuration files
+```bash
+touch .env config.json settings.yaml
+```
+
+### Batch file creation
+```bash
+for i in 1 2 3 4 5; do
+  touch "file$i.txt"
+done
+```
+
+## Common Patterns
+
+### Create and immediately edit
+```bash
+touch newscript.sh
+echo "#!/bin/nash" > newscript.sh
+echo "echo 'Hello World'" >> newscript.sh
+```
+
+### Ensure file exists before operations
+```bash
+touch logfile.txt
+echo "Starting process..." >> logfile.txt
+```
+
+### Create test fixtures
+```bash
+mkdir -p tests/fixtures
+touch tests/fixtures/empty.txt
+echo "sample data" > tests/fixtures/sample.txt
+```
+
+### Initialize documentation structure
+```bash
+mkdir -p docs/{api,guides,reference}
+touch docs/README.md
+touch docs/api/index.md
+touch docs/guides/getting-started.md
+touch docs/reference/commands.md
+```
+
+## Working with Mount Points
+
+### Create files in mounted directory
+
+```bash
+# Launch Nash with: nash --bind ./workspace:/workspace
+touch /workspace/new_document.txt
+```
+
+This creates a real file in `./workspace/new_document.txt` on the host system.
+
+### Create files that persist
+
+```bash
+# Without mounts, files exist only in memory
+touch /tmp/ephemeral.txt  # Lost when Nash exits
+
+# With mount, files persist on host
+# nash --bind ./persistent:/persistent
+touch /persistent/permanent.txt  # Saved to host
+```
+
+## Related Commands
+
+- [`mkdir`](/commands/mkdir) - Create directories
+- [`rm`](/commands/rm) - Remove files
+- [`ls`](/commands/ls) - List files to verify creation
+- [`stat`](/commands/stat) - Check file information
+- [`cat`](/commands/cat) - View or create file with content
+- [`echo`](/commands/echo) - Write content to files

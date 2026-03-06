@@ -1,0 +1,212 @@
+---
+title: 'Sandbox Security'
+description: 'How Nash enforces complete isolation from the host system'
+---
+
+Nash achieves total sandboxing through **structural enforcement**, not just policy. The runtime is architecturally incapable of executing system commands or accessing the host filesystem without explicit permission.
+
+## No System Command Execution
+
+Nash never spawns real processes or calls the operating system shell. The codebase **completely avoids** `std::process::Command`.
+
+<CodeGroup>
+```bash Verify no system calls
+grep -r "std::process\|Command::new\|bash -c" src/
+# (no output)
+```
+
+```rust Executor implementation
+// src/runtime/executor.rs
+use crate::builtins;
+use crate::parser::ast::{Expr, RedirectMode, Word, WordPart};
+use crate::vfs::mount::MountOptions;
+use crate::vfs::path::VfsPath;
+use crate::vfs::Vfs;
+
+// Note: std::process is NEVER imported
+```
+</CodeGroup>
+
+<Note>
+All 28 built-in commands are implemented in Rust and executed in-memory. There is no way to shell out to the host OS.
+</Note>
+
+## Virtual Filesystem Isolation
+
+Every file operation goes through the `Vfs` API, which maintains an in-memory directory tree. Host paths are completely unreachable unless explicitly mounted.
+
+```rust VFS structure
+// src/vfs/mod.rs
+pub struct Vfs {
+    nodes: HashMap<String, FsNode>,  // In-memory file tree
+    mounts: Vec<MountPoint>,         // Explicit host bindings
+}
+```
+
+File operations are dispatched to the VFS:
+
+```rust File I/O through VFS
+pub fn read(&self, path: &str) -> Result<Vec<u8>> {
+    let p = VfsPath::normalize(path);
+    
+    // Try in-memory nodes first
+    if let Some(node) = self.nodes.get(&p) {
+        match node {
+            FsNode::File(data) => return Ok(data.clone()),
+            FsNode::Directory(_) => bail!("is a directory: {}", path),
+        }
+    }
+    
+    // Fall back to host mount only if configured
+    if let Some(mp) = self.find_mount(&p) {
+        let host_path = /* map VFS path to host */;
+        return std::fs::read(&host_path);
+    }
+    
+    bail!("no such file: {}", path)
+}
+```
+
+<Info>
+Without a mount binding, Nash commands cannot read, write, or even detect the existence of host files.
+</Info>
+
+## Read-Only Mount Protection
+
+When directories are mounted with `--bind-ro`, writes are rejected at the VFS layer—before any command logic runs.
+
+```rust Write protection
+fn check_write_allowed(&self, vfs_path: &str) -> Result<()> {
+    if let Some(mp) = self.find_mount(vfs_path) {
+        if mp.opts.read_only {
+            bail!("filesystem is read-only: {}", vfs_path);
+        }
+    }
+    Ok(())
+}
+
+pub fn write(&mut self, path: &str, data: Vec<u8>) -> Result<()> {
+    let p = VfsPath::normalize(path);
+    self.check_write_allowed(&p)?;  // Enforced here
+    // ... proceed with write
+}
+```
+
+### Example
+
+```bash Read-only enforcement
+nash --bind-ro ./config:/config
+
+user@nash:/home/user$ echo "hack" > /config/settings.toml
+Error: filesystem is read-only: /config/settings.toml
+
+user@nash:/home/user$ cat /config/settings.toml
+# Original file content is readable
+```
+
+## Subshell Context Isolation
+
+Subshells `( )` run on a **cloned context**. Environment variable changes and directory changes inside the subshell do not escape.
+
+```rust Subshell isolation
+Expr::Subshell { expr } => {
+    // Save current state
+    let saved_cwd = self.ctx.cwd.clone();
+    let saved_env = self.ctx.env.clone();
+    
+    // Execute subshell
+    let result = self.eval(expr, stdin);
+    
+    // Restore state (env changes don't propagate)
+    self.ctx.cwd = saved_cwd;
+    self.ctx.env = saved_env;
+    
+    result
+}
+```
+
+### Example
+
+```bash Environment isolation
+user@nash:/home/user$ export TESTVAR=before
+user@nash:/home/user$ echo $TESTVAR
+before
+
+user@nash:/home/user$ (export TESTVAR=inside; echo $TESTVAR)
+inside
+
+user@nash:/home/user$ echo $TESTVAR
+before
+```
+
+<Warning>
+Directory changes inside a subshell also do not persist:
+```bash
+(cd /tmp && pwd)  # prints /tmp
+pwd               # still prints /home/user
+```
+</Warning>
+
+## Security Verification
+
+You can audit Nash's sandboxing guarantees by inspecting the source:
+
+<Accordion title="Commands to verify sandboxing">
+```bash Check for system calls
+# Should return no results
+grep -r "std::process" src/
+grep -r "Command::new" src/
+grep -r "std::process::Command" src/
+```
+
+```bash Check VFS enforcement
+# All file operations go through vfs/mod.rs
+grep -rn "std::fs::read\|std::fs::write" src/ | grep -v "src/vfs/"
+# Only vfs/mod.rs touches std::fs (for mounts)
+```
+
+```bash Verify read-only checks
+grep -n "check_write_allowed" src/vfs/mod.rs
+# Line 127, 159, 241, 259, 348 — all write paths protected
+```
+</Accordion>
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────┐
+│          User Commands                  │
+└────────────┬────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────┐
+│    Executor (runtime/executor.rs)       │
+│    • No std::process::Command           │
+│    • All commands = Rust builtins       │
+└────────────┬────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────┐
+│       VFS API (vfs/mod.rs)              │
+│    • In-memory file tree                │
+│    • Mount point enforcement            │
+│    • Read-only checks                   │
+└────────────┬────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────┐
+│    Host Filesystem (if mounted)         │
+│    • Only accessible via --bind         │
+│    • Enforced read-only if --bind-ro    │
+└─────────────────────────────────────────┘
+```
+
+## Summary
+
+| Security Layer | Enforcement Mechanism |
+|----------------|----------------------|
+| **No system commands** | `std::process::Command` never imported |
+| **Filesystem isolation** | All I/O through `Vfs` API |
+| **Read-only mounts** | Write rejection at VFS layer |
+| **Subshell isolation** | Context cloning before execution |
+| **Mount requirement** | Host paths unreachable without `--bind` |

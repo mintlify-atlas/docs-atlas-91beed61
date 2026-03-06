@@ -1,0 +1,563 @@
+---
+title: Builtins Architecture
+description: Command implementation patterns and builtin system design
+---
+
+Nash implements all shell commands as **built-in Rust functions** — no external binaries are ever executed. This page explains how the builtin system works and how commands are implemented.
+
+## Module Structure
+
+```
+builtins/
+├── mod.rs          # Builtin trait + dispatch table
+├── cat.rs          # Concatenate and print files
+├── cd.rs           # Change directory
+├── clear.rs        # Clear screen
+├── cp.rs           # Copy files
+├── cut.rs          # Cut fields from lines
+├── echo.rs         # Print text
+├── env.rs          # Environment variables (env, export, unset)
+├── file.rs         # Detect file type
+├── find.rs         # Search for files
+├── grep.rs         # Filter lines
+├── head_tail.rs    # First/last N lines (head, tail)
+├── help.rs         # Command reference
+├── history.rs      # Command history
+├── jq.rs           # JSON processor
+├── ls.rs           # List directory
+├── mkdir.rs        # Create directory
+├── mv.rs           # Move/rename files
+├── pwd.rs          # Print working directory
+├── rm.rs           # Remove files
+├── sed.rs          # Stream editor
+├── sort.rs         # Sort lines
+├── stat.rs         # File status
+├── touch.rs        # Create empty file
+├── tree.rs         # Directory tree view
+├── uniq.rs         # Filter duplicate lines
+├── util.rs         # Utilities (true, false, test)
+├── wc.rs           # Word count
+└── which.rs        # Locate command
+```
+
+<Info>
+Nash includes **28 built-in commands** covering file operations, text processing, and shell utilities.
+</Info>
+
+## Builtin Trait
+
+Every command implements the same trait (src/builtins/mod.rs:38-41):
+
+```rust
+pub trait Builtin {
+    fn run(&self, args: &[String], ctx: &mut Context, stdin: &str) -> Result<Output>;
+}
+```
+
+**Parameters:**
+
+- `args` — Command-line arguments (already expanded)
+- `ctx` — Mutable session context (cwd, env, VFS, history)
+- `stdin` — Standard input as a string
+
+**Returns:**
+
+- `Result<Output>` — Success with `Output { stdout, stderr, exit_code }`
+
+## Dispatch Table
+
+From src/builtins/mod.rs:44-81:
+
+```rust
+pub fn dispatch(name: &str) -> Option<Box<dyn Builtin>> {
+    match name {
+        "cat" => Some(Box::new(cat::Cat)),
+        "cd" => Some(Box::new(cd::Cd)),
+        "clear" => Some(Box::new(clear::Clear)),
+        "cp" => Some(Box::new(cp::Cp)),
+        "cut" => Some(Box::new(cut::Cut)),
+        "echo" => Some(Box::new(echo::Echo)),
+        "env" => Some(Box::new(env::EnvCmd)),
+        "export" => Some(Box::new(env::Export)),
+        "unset" => Some(Box::new(env::Unset)),
+        "file" => Some(Box::new(file::FileCmd)),
+        "find" => Some(Box::new(find::Find)),
+        "grep" => Some(Box::new(grep::Grep)),
+        "head" => Some(Box::new(head_tail::Head)),
+        "tail" => Some(Box::new(head_tail::Tail)),
+        "help" => Some(Box::new(help::Help)),
+        "history" => Some(Box::new(history::History)),
+        "jq" => Some(Box::new(jq::Jq)),
+        "ls" => Some(Box::new(ls::Ls)),
+        "mkdir" => Some(Box::new(mkdir::Mkdir)),
+        "mv" => Some(Box::new(mv::Mv)),
+        "pwd" => Some(Box::new(pwd::Pwd)),
+        "rm" => Some(Box::new(rm::Rm)),
+        "sed" => Some(Box::new(sed::Sed)),
+        "sort" => Some(Box::new(sort::Sort)),
+        "stat" => Some(Box::new(stat::Stat)),
+        "touch" => Some(Box::new(touch::Touch)),
+        "tree" => Some(Box::new(tree::Tree)),
+        "true" => Some(Box::new(util::True)),
+        "false" => Some(Box::new(util::False)),
+        "test" | "[" => Some(Box::new(util::Test)),
+        "uniq" => Some(Box::new(uniq::Uniq)),
+        "wc" => Some(Box::new(wc::Wc)),
+        "which" => Some(Box::new(which::Which)),
+        _ => None,
+    }
+}
+```
+
+The runtime calls `dispatch(command_name)` and executes the returned trait object.
+
+## Example Implementations
+
+### Simple Command: Echo
+
+From src/builtins/echo.rs:5-35:
+
+```rust
+pub struct Echo;
+
+impl Builtin for Echo {
+    fn run(&self, args: &[String], _ctx: &mut Context, _stdin: &str) -> Result<Output> {
+        let mut no_newline = false;
+        let mut parts: Vec<&str> = Vec::new();
+        
+        let mut iter = args.iter();
+        while let Some(arg) = iter.next() {
+            if arg == "-n" {
+                no_newline = true;
+            } else if arg == "-e" {
+                // Enable escape interpretation (handled below)
+            } else {
+                parts.push(arg.as_str());
+            }
+        }
+        
+        let text = parts.join(" ");
+        let expanded = expand_escapes(&text);  // Handle \n, \t, etc.
+        
+        let out = if no_newline {
+            expanded
+        } else {
+            format!("{}\n", expanded)
+        };
+        
+        Ok(Output::success(out))
+    }
+}
+```
+
+**Key points:**
+
+- Parse flags (`-n`, `-e`)
+- Join remaining args with spaces
+- Expand escape sequences
+- Return output with optional newline
+
+### File Reader: Cat
+
+From src/builtins/cat.rs:6-39:
+
+```rust
+pub struct Cat;
+
+impl Builtin for Cat {
+    fn run(&self, args: &[String], ctx: &mut Context, stdin: &str) -> Result<Output> {
+        if args.is_empty() {
+            // No args: pass through stdin
+            return Ok(Output::success(stdin));
+        }
+        
+        let mut out = String::new();
+        for arg in args {
+            if arg.starts_with('-') {
+                continue;  // Ignore flags
+            }
+            
+            // Resolve path relative to cwd
+            let abs = VfsPath::join(&ctx.cwd, arg);
+            
+            // Read from VFS
+            match ctx.vfs.read_to_string(&abs) {
+                Ok(content) => out.push_str(&content),
+                Err(e) => {
+                    return Ok(Output::error(
+                        1,
+                        "",
+                        &format!("cat: {}: {}\n", arg, e),
+                    ));
+                }
+            }
+        }
+        
+        Ok(Output::success(out))
+    }
+}
+```
+
+**Key points:**
+
+- If no args, return stdin (pipe pass-through)
+- Join path with cwd to get absolute path
+- Read file from VFS
+- Accumulate output from multiple files
+
+### Text Filter: Grep
+
+From src/builtins/grep.rs:6-105:
+
+```rust
+pub struct Grep;
+
+impl Builtin for Grep {
+    fn run(&self, args: &[String], ctx: &mut Context, stdin: &str) -> Result<Output> {
+        let mut invert = false;
+        let mut ignore_case = false;
+        let mut line_number = false;
+        let mut pattern: Option<String> = None;
+        let mut files: Vec<String> = Vec::new();
+        
+        // Parse arguments
+        for arg in args {
+            match arg.as_str() {
+                "-v" | "--invert-match" => invert = true,
+                "-i" | "--ignore-case" => ignore_case = true,
+                "-n" | "--line-number" => line_number = true,
+                s if s.starts_with('-') => {} // Ignore unknown flags
+                _ => {
+                    if pattern.is_none() {
+                        pattern = Some(arg.clone());
+                    } else {
+                        files.push(arg.clone());
+                    }
+                }
+            }
+        }
+        
+        let pat = match pattern {
+            Some(p) => p,
+            None => return Ok(Output::error(1, "", "grep: missing pattern\n")),
+        };
+        
+        // Read input (stdin or files)
+        let text = if files.is_empty() {
+            stdin.to_string()
+        } else {
+            let mut buf = String::new();
+            for f in &files {
+                let abs = VfsPath::join(&ctx.cwd, f);
+                match ctx.vfs.read_to_string(&abs) {
+                    Ok(c) => buf.push_str(&c),
+                    Err(e) => return Ok(Output::error(1, "", &format!("grep: {}\n", e))),
+                }
+            }
+            buf
+        };
+        
+        // Filter lines
+        let mut out = String::new();
+        let mut matched = false;
+        for (i, line) in text.lines().enumerate() {
+            let haystack = if ignore_case { line.to_lowercase() } else { line.to_string() };
+            let needle = if ignore_case { pat.to_lowercase() } else { pat.clone() };
+            let found = haystack.contains(&needle);
+            let show = if invert { !found } else { found };
+            
+            if show {
+                matched = true;
+                if line_number {
+                    out.push_str(&format!("{}:{}\n", i + 1, line));
+                } else {
+                    out.push_str(line);
+                    out.push('\n');
+                }
+            }
+        }
+        
+        if matched {
+            Ok(Output::success(out))
+        } else {
+            Ok(Output::error(1, "", ""))  // Exit 1 if no matches
+        }
+    }
+}
+```
+
+**Key points:**
+
+- Parse flags and collect pattern + files
+- Read from stdin or files
+- Line-by-line filtering with case and invert support
+- Return exit code 1 if no matches found
+
+## Common Patterns
+
+### 1. Flag Parsing
+
+```rust
+let mut flag = false;
+let mut positional = Vec::new();
+
+for arg in args {
+    match arg.as_str() {
+        "-f" | "--flag" => flag = true,
+        s if s.starts_with('-') => {} // Ignore unknown
+        _ => positional.push(arg.clone()),
+    }
+}
+```
+
+### 2. Path Resolution
+
+```rust
+use crate::vfs::path::VfsPath;
+
+let relative_path = "file.txt";
+let absolute_path = VfsPath::join(&ctx.cwd, relative_path);
+```
+
+### 3. VFS Operations
+
+```rust
+// Read file
+let content = ctx.vfs.read_to_string(&path)?;
+
+// Write file
+ctx.vfs.write_str(&path, "data")?;
+
+// Check existence
+if ctx.vfs.exists(&path) { /* ... */ }
+
+// List directory
+let entries = ctx.vfs.list_dir(&path)?;
+for entry in entries {
+    println!("{}", entry.name);
+}
+```
+
+### 4. Environment Access
+
+```rust
+// Read variable
+let home = ctx.env.get("HOME").cloned().unwrap_or_default();
+
+// Set variable
+ctx.env.insert("MY_VAR".to_string(), "value".to_string());
+
+// Remove variable
+ctx.env.remove("MY_VAR");
+```
+
+### 5. Stdin Handling
+
+```rust
+if args.is_empty() {
+    // Process stdin
+    for line in stdin.lines() {
+        // ...
+    }
+} else {
+    // Process files
+    for file in args {
+        let content = ctx.vfs.read_to_string(file)?;
+        // ...
+    }
+}
+```
+
+### 6. Error Handling
+
+```rust
+match ctx.vfs.read(&path) {
+    Ok(data) => { /* process data */ }
+    Err(e) => {
+        return Ok(Output::error(
+            1,
+            "",
+            &format!("command: {}: {}\n", path, e),
+        ));
+    }
+}
+```
+
+## Complete Builtin List
+
+Nash includes these 28 built-in commands:
+
+<Accordion title="File Operations (10)">
+| Command | Description |
+|---------|-------------|
+| `cat` | Concatenate and print files |
+| `cp` | Copy files |
+| `ls` | List directory contents |
+| `mkdir` | Create directory |
+| `mv` | Move/rename files |
+| `rm` | Remove files/directories |
+| `touch` | Create empty file |
+| `stat` | Display file status |
+| `file` | Detect file type |
+| `find` | Search for files |
+</Accordion>
+
+<Accordion title="Text Processing (9)">
+| Command | Description |
+|---------|-------------|
+| `echo` | Print text |
+| `cat` | Pass-through stdin or print files |
+| `grep` | Filter lines by pattern |
+| `sed` | Stream editor (substitute, delete) |
+| `cut` | Extract fields from lines |
+| `sort` | Sort lines |
+| `uniq` | Filter duplicate lines |
+| `head` | First N lines |
+| `tail` | Last N lines |
+| `wc` | Count lines/words/bytes |
+</Accordion>
+
+<Accordion title="Shell Utilities (9)">
+| Command | Description |
+|---------|-------------|
+| `cd` | Change directory |
+| `pwd` | Print working directory |
+| `env` | List environment variables |
+| `export` | Set environment variable |
+| `unset` | Remove environment variable |
+| `history` | Show command history |
+| `which` | Check if command is builtin |
+| `help` | Display command reference |
+| `clear` | Clear screen |
+</Accordion>
+
+<Accordion title="Advanced (3)">
+| Command | Description |
+|---------|-------------|
+| `jq` | JSON processor (`.key`, `keys`, `values`, `length`, `type`, `.[]`) |
+| `tree` | Directory tree view |
+| `test` / `[` | Evaluate conditional expressions |
+</Accordion>
+
+<Accordion title="Utilities (3)">
+| Command | Description |
+|---------|-------------|
+| `true` | Exit with code 0 |
+| `false` | Exit with code 1 |
+| `test` | Evaluate expressions (`-f`, `-d`, `-e`, `-z`, `-n`, `=`, `-eq`) |
+</Accordion>
+
+## Adding a New Builtin
+
+To add a new command:
+
+### 1. Create the module file
+
+```rust
+// src/builtins/mycommand.rs
+use super::Builtin;
+use crate::runtime::{Context, Output};
+use crate::vfs::path::VfsPath;
+use anyhow::Result;
+
+pub struct MyCommand;
+
+impl Builtin for MyCommand {
+    fn run(&self, args: &[String], ctx: &mut Context, stdin: &str) -> Result<Output> {
+        // Your implementation here
+        Ok(Output::success("Hello from my command\n"))
+    }
+}
+```
+
+### 2. Register in mod.rs
+
+```rust
+// src/builtins/mod.rs
+mod mycommand;
+
+pub fn dispatch(name: &str) -> Option<Box<dyn Builtin>> {
+    match name {
+        // ... existing commands ...
+        "mycommand" => Some(Box::new(mycommand::MyCommand)),
+        _ => None,
+    }
+}
+```
+
+### 3. Test your command
+
+```rust
+#[cfg(test)]
+mod tests {
+    use crate::parser::parse;
+    use crate::runtime::{Executor, ExecutorConfig};
+    
+    #[test]
+    fn test_mycommand() {
+        let mut executor = Executor::new(ExecutorConfig::default(), "user").unwrap();
+        let out = executor.execute(&parse("mycommand").unwrap()).unwrap();
+        assert_eq!(out.stdout, "Hello from my command\n");
+    }
+}
+```
+
+## Design Decisions
+
+### 1. Trait-Based Dispatch
+
+Using a trait allows:
+
+- Uniform interface for all commands
+- Easy testing (mock implementations)
+- Dynamic dispatch via `Box<dyn Builtin>`
+
+### 2. One File Per Command
+
+Each command lives in its own file:
+
+- Clear organization
+- Easy to find implementation
+- No giant monolithic file
+
+### 3. Mutable Context
+
+Commands receive `&mut Context` to:
+
+- Modify environment (`export`, `unset`)
+- Change directory (`cd`)
+- Access VFS for reads/writes
+
+### 4. String-Based I/O
+
+All stdin/stdout is `String`, not `Vec<u8>`:
+
+- Simplifies text processing
+- Matches bash behavior (text-oriented)
+- Binary data still supported via VFS `Vec<u8>`
+
+## Testing
+
+Builtins are tested end-to-end via the runtime (src/runtime/executor.rs:291-715):
+
+```rust
+#[test]
+fn test_grep_invert() {
+    let out = exec("echo hello | grep -v world");
+    assert_eq!(out.stdout, "hello\n");
+}
+
+#[test]
+fn test_find_basic() {
+    let mut executor = Executor::new(ExecutorConfig::default(), "user").unwrap();
+    executor.execute(&parse("touch /tmp/findme.txt").unwrap()).unwrap();
+    let out = executor.execute(&parse("find /tmp -name findme.txt").unwrap()).unwrap();
+    assert!(out.stdout.contains("findme.txt"));
+}
+```
+
+## Next Steps
+
+- [Runtime Architecture](/architecture/runtime) — How builtins are dispatched
+- [VFS Architecture](/architecture/vfs) — How builtins interact with files
+- [Commands Reference](/commands/overview) — Detailed command documentation

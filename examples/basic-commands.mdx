@@ -1,0 +1,277 @@
+---
+title: Basic Commands
+description: Learn the essential Nash commands for everyday tasks
+---
+
+Nash provides all the fundamental Unix commands you need for navigating directories, managing files, and working with environment variables.
+
+## Navigation Commands
+
+<Steps>
+  <Step title="List directory contents">
+    Use `ls` to see what's in your current directory:
+
+    ```bash
+    user@nash:/home/user$ ls
+    Desktop/  Documents/  Downloads/  welcome.txt
+    ```
+
+    Show hidden files and detailed information:
+
+    ```bash
+    user@nash:/home/user$ ls -la
+    drwxr-xr-x  5 user  user   160 Dec 10 14:30 .
+    drwxr-xr-x  3 root  root    96 Dec 10 14:30 ..
+    drwxr-xr-x  2 user  user    64 Dec 10 14:30 Desktop
+    drwxr-xr-x  2 user  user    64 Dec 10 14:30 Documents
+    drwxr-xr-x  2 user  user    64 Dec 10 14:30 Downloads
+    -rw-r--r--  1 user  user   142 Dec 10 14:30 .nashrc
+    -rw-r--r--  1 user  user    52 Dec 10 14:30 welcome.txt
+    ```
+  </Step>
+
+  <Step title="Navigate directories">
+    Change to a different directory:
+
+    ```bash
+    user@nash:/home/user$ cd Documents
+    user@nash:/home/user/Documents$ pwd
+    /home/user/Documents
+    ```
+
+    Go back to your home directory:
+
+    ```bash
+    user@nash:/home/user/Documents$ cd
+    user@nash:/home/user$ pwd
+    /home/user
+    ```
+
+    Return to the previous directory:
+
+    ```bash
+    user@nash:/home/user$ cd /tmp
+    user@nash:/tmp$ cd -
+    user@nash:/home/user$
+    ```
+  </Step>
+
+  <Step title="Print working directory">
+    Always know where you are:
+
+    ```bash
+    user@nash:/home/user$ pwd
+    /home/user
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  The `cd` command without arguments always takes you back to `$HOME`, and `cd -` toggles between your current and previous directory.
+</Tip>
+
+## File Management
+
+### Creating Files and Directories
+
+<CodeGroup>
+```bash Create empty files
+user@nash:/home/user$ touch notes.txt ideas.md
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  ideas.md  notes.txt  welcome.txt
+```
+
+```bash Create directories
+user@nash:/home/user$ mkdir projects
+user@nash:/home/user$ mkdir -p work/reports/2024
+user@nash:/home/user$ ls work/reports/
+2024/
+```
+</CodeGroup>
+
+### Removing Files and Directories
+
+<CodeGroup>
+```bash Remove files
+user@nash:/home/user$ rm notes.txt
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  ideas.md  projects/  welcome.txt  work/
+```
+
+```bash Remove directories
+user@nash:/home/user$ rm -r projects
+user@nash:/home/user$ rm -rf work
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  ideas.md  welcome.txt
+```
+</CodeGroup>
+
+<Tip>
+  Use `-r` for recursive deletion of directories, and `-f` to force deletion without prompts. Combine them as `-rf` for maximum power.
+</Tip>
+
+## Text Output
+
+### Echo Command
+
+The `echo` command prints text to stdout:
+
+```bash
+user@nash:/home/user$ echo hello world
+hello world
+
+user@nash:/home/user$ echo "Hello, $USER!"
+Hello, user!
+
+user@nash:/home/user$ echo -n "No newline"
+No newlineuser@nash:/home/user$
+```
+
+Use `-e` to enable escape sequences:
+
+```bash
+user@nash:/home/user$ echo -e "Line 1\nLine 2\nLine 3"
+Line 1
+Line 2
+Line 3
+```
+
+### Cat Command
+
+Display file contents:
+
+```bash
+user@nash:/home/user$ cat welcome.txt
+Welcome to Nash!
+
+This is your virtual home directory.
+
+user@nash:/home/user$ cat ideas.md
+# Project Ideas
+
+- Build a CLI tool
+- Write documentation
+- Learn Rust
+```
+
+Concatenate multiple files:
+
+```bash
+user@nash:/home/user$ cat welcome.txt ideas.md
+Welcome to Nash!
+
+This is your virtual home directory.
+# Project Ideas
+
+- Build a CLI tool
+- Write documentation
+- Learn Rust
+```
+
+## Environment Variables
+
+### Viewing Environment
+
+<Tabs>
+  <Tab title="List all variables">
+    ```bash
+    user@nash:/home/user$ env
+    USER=user
+    LOGNAME=user
+    HOME=/home/user
+    SHELL=nash
+    TERM=xterm-256color
+    LANG=en_US.UTF-8
+    LC_ALL=en_US.UTF-8
+    PATH=/usr/local/bin:/usr/bin:/bin
+    PWD=/home/user
+    HOSTNAME=nash
+    SHLVL=1
+    ```
+  </Tab>
+
+  <Tab title="Access specific variable">
+    ```bash
+    user@nash:/home/user$ echo $USER
+    user
+
+    user@nash:/home/user$ echo $HOME
+    /home/user
+
+    user@nash:/home/user$ echo $PATH
+    /usr/local/bin:/usr/bin:/bin
+    ```
+  </Tab>
+</Tabs>
+
+### Setting Environment Variables
+
+```bash
+user@nash:/home/user$ export API_KEY=secret123
+user@nash:/home/user$ export DEBUG=true
+user@nash:/home/user$ export LOG_LEVEL=info
+
+user@nash:/home/user$ echo $DEBUG
+true
+
+user@nash:/home/user$ env | grep -E '(API_KEY|DEBUG|LOG_LEVEL)'
+API_KEY=secret123
+DEBUG=true
+LOG_LEVEL=info
+```
+
+Unset variables:
+
+```bash
+user@nash:/home/user$ unset DEBUG
+user@nash:/home/user$ echo $DEBUG
+
+```
+
+## Real Terminal Session
+
+Here's a complete example showing common tasks:
+
+```bash
+user@nash:/home/user$ pwd
+/home/user
+
+user@nash:/home/user$ mkdir -p projects/myapp
+user@nash:/home/user$ cd projects/myapp
+
+user@nash:/home/user/projects/myapp$ touch README.md
+user@nash:/home/user/projects/myapp$ echo "# My App" > README.md
+user@nash:/home/user/projects/myapp$ cat README.md
+# My App
+
+user@nash:/home/user/projects/myapp$ mkdir src tests docs
+user@nash:/home/user/projects/myapp$ ls -l
+drwxr-xr-x  2 user  user    64 Dec 10 15:00 docs
+-rw-r--r--  1 user  user     9 Dec 10 15:00 README.md
+drwxr-xr-x  2 user  user    64 Dec 10 15:00 src
+drwxr-xr-x  2 user  user    64 Dec 10 15:00 tests
+
+user@nash:/home/user/projects/myapp$ export PROJECT_NAME=myapp
+user@nash:/home/user/projects/myapp$ echo "Building $PROJECT_NAME..."
+Building myapp...
+
+user@nash:/home/user/projects/myapp$ cd
+user@nash:/home/user$ pwd
+/home/user
+```
+
+## Command Reference
+
+| Command | Description | Common Flags |
+|---------|-------------|-------------|
+| `ls` | List directory contents | `-l` (long), `-a` (all/hidden) |
+| `cd` | Change directory | `cd` (home), `cd -` (previous) |
+| `pwd` | Print working directory | |
+| `mkdir` | Create directories | `-p` (create parents) |
+| `touch` | Create empty files | |
+| `rm` | Remove files/directories | `-r` (recursive), `-f` (force) |
+| `echo` | Print text | `-n` (no newline), `-e` (escapes) |
+| `cat` | Display file contents | |
+| `env` | List environment variables | |
+| `export` | Set environment variable | |
+| `unset` | Remove environment variable | |

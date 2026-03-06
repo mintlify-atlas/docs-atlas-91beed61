@@ -1,0 +1,410 @@
+---
+title: RC Files
+description: Customizing your Nash environment with initialization scripts
+---
+
+## What Are RC Files?
+
+RC (run commands) files are shell scripts that Nash automatically executes on startup. They let you customize your environment by:
+
+- Setting environment variables
+- Defining aliases (if supported)
+- Creating default directories
+- Initializing the VFS with files
+- Configuring shell behavior
+
+RC files run **before** any interactive prompt or script execution, giving you a fully configured environment from the start.
+
+## Default RC File Locations
+
+Nash looks for rc files in the **VFS** (not the host filesystem) at these locations:
+
+### Login Shell Mode (`-l` or `--login`)
+
+When Nash is started as a login shell, it sources files in this order:
+
+1. `/etc/profile` (system-wide profile)
+2. `~/.nashrc` (user-specific rc file)
+
+Example:
+
+```bash
+nash -l
+```
+
+This loads `/etc/profile` first, then `/home/user/.nashrc`.
+
+### Non-Login Shell (Default)
+
+Without `-l`, Nash only sources:
+
+- `~/.nashrc` (where `~` is `/home/<username>`)
+
+Example:
+
+```bash
+nash  # Sources /home/user/.nashrc only
+```
+
+<Note>
+The `~/.nashrc` file is automatically created when Nash initializes the VFS with a default template that exports the username.
+</Note>
+
+## Default `.nashrc` Template
+
+Nash creates a basic `~/.nashrc` in the VFS during startup:
+
+```bash ~/.nashrc
+# ~/.nashrc
+export USER=user
+```
+
+This ensures `$USER` is set even if you override defaults. The username matches the value from `-U`.
+
+## Custom RC Files with `--rcfile`
+
+Use `--rcfile` to specify a custom initialization script instead of the default `~/.nashrc`:
+
+```bash
+nash --rcfile ./custom.nashrc
+nash --rcfile /path/to/init.sh
+```
+
+Nash searches for the rc file in this order:
+
+1. **VFS**: Check if the path exists in the virtual filesystem
+2. **Host**: If not in VFS, read from the host filesystem
+
+### Example: Custom RC File
+
+Create `custom.nashrc` on your host:
+
+```bash custom.nashrc
+# Custom Nash initialization
+export DEBUG=true
+export API_URL=http://localhost:8080
+
+echo "Custom environment loaded!"
+mkdir -p /tmp/workspace
+cd /tmp/workspace
+```
+
+Load it:
+
+```bash
+nash --rcfile ./custom.nashrc
+```
+
+Output:
+
+```
+Custom environment loaded!
+Nash — Not A Shell  │  logged in as user  │  type help or Ctrl-D to exit
+
+user@nash:/tmp/workspace$
+```
+
+## Disabling RC Files with `--norc`
+
+Use `--norc` to skip all rc file loading, giving you a clean, default environment:
+
+```bash
+nash --norc
+```
+
+No files are sourced, not even `~/.nashrc`. This is useful for:
+
+- Reproducible testing
+- Debugging rc file issues
+- Scripting with predictable state
+
+### Example: Clean Script Execution
+
+```bash
+nash --norc script.sh
+```
+
+Runs `script.sh` without any rc file modifications to the environment.
+
+## RC File Examples
+
+### Development Environment
+
+```bash ~/.nashrc
+# Development environment setup
+export NODE_ENV=development
+export DEBUG=true
+export LOG_LEVEL=verbose
+
+# Create project structure
+mkdir -p /workspace/src
+mkdir -p /workspace/tests
+mkdir -p /tmp/logs
+
+echo "Development environment ready!"
+```
+
+### System-Wide Profile
+
+Create `/etc/profile` in the VFS (requires initialization):
+
+```bash /etc/profile
+# System-wide profile for all users
+export LANG=en_US.UTF-8
+export PATH=/usr/local/bin:/usr/bin:/bin
+export HOSTNAME=nash
+
+echo "System profile loaded"
+```
+
+This is sourced first when using `-l`.
+
+### Testing Configuration
+
+```bash test.nashrc
+# Test environment
+export TEST_MODE=true
+export ENV=test
+export VERBOSE=1
+
+# Prepare test directories
+mkdir -p /tmp/test-data
+mkdir -p /tmp/test-output
+
+echo "Test environment initialized"
+```
+
+Run:
+
+```bash
+nash --rcfile test.nashrc test-suite.sh
+```
+
+## RC Files with Mounts
+
+RC files can set up the environment **before** accessing mounted directories:
+
+```bash setup.nashrc
+# Prepare to work with mounted data
+export DATA_DIR=/data
+export OUTPUT_DIR=/output
+
+echo "Checking mounted directories..."
+test -d $DATA_DIR && echo "Data directory found" || echo "Warning: no data mount"
+```
+
+Run:
+
+```bash
+nash --rcfile setup.nashrc -B ./host-data:/data
+```
+
+The rc file runs after mounts are established, so `/data` is accessible.
+
+## Login Shell vs Non-Login Shell
+
+<Tabs>
+  <Tab title="Login Shell">
+    ```bash
+    nash -l
+    ```
+    
+    Sources:
+    1. `/etc/profile` (if exists in VFS)
+    2. `~/.nashrc` (if exists in VFS or host)
+    
+    Use for full user session initialization.
+  </Tab>
+  
+  <Tab title="Non-Login Shell">
+    ```bash
+    nash
+    ```
+    
+    Sources:
+    - `~/.nashrc` only (if exists in VFS or host)
+    
+    Use for subshells or script execution.
+  </Tab>
+</Tabs>
+
+## RC File Execution Order
+
+When starting Nash, rc files are processed in this order:
+
+1. **Mounts applied**: Host directories mounted to VFS
+2. **Login shell check**: If `-l` flag present, source `/etc/profile` from VFS
+3. **User rc file**: Source `~/.nashrc` (or custom file from `--rcfile`)
+4. **Script/REPL**: Execute the script or start interactive mode
+
+<Note>
+Shebang lines (`#!/usr/bin/env nash`) in rc files are automatically skipped.
+</Note>
+
+## RC File Best Practices
+
+### Keep RC Files Simple
+
+RC files should be fast and idempotent:
+
+```bash
+# Good: Simple environment setup
+export DEBUG=true
+mkdir -p /tmp/logs
+
+# Avoid: Complex logic
+# for i in $(seq 1 100); do ...; done
+```
+
+### Use Comments
+
+Document your rc file for future reference:
+
+```bash ~/.nashrc
+# Nash RC - Development Environment
+# Author: Alice
+# Last updated: 2026-03-06
+
+# API configuration
+export API_URL=http://localhost:8080
+export API_KEY=dev-key-123
+
+# Project paths
+export PROJECT_ROOT=/workspace
+export LOG_DIR=/tmp/logs
+```
+
+### Handle Missing Directories
+
+```bash
+# Create directories if they don't exist
+mkdir -p /tmp/workspace || true
+mkdir -p /var/log || true
+```
+
+### Test Your RC File
+
+Run Nash with your rc file and immediately exit to verify:
+
+```bash
+nash --rcfile custom.nashrc -c 'env | grep DEBUG'
+```
+
+## Debugging RC Files
+
+If your rc file isn't working as expected:
+
+### Run with Verbose Mode
+
+```bash
+nash -v --rcfile custom.nashrc
+```
+
+This prints each line as it's read.
+
+### Run with Trace Mode
+
+```bash
+nash -x --rcfile custom.nashrc
+```
+
+This shows each command as it executes.
+
+### Disable RC Temporarily
+
+```bash
+nash --norc
+```
+
+Run without any rc file to isolate the issue.
+
+### Check for Parse Errors
+
+If there's a syntax error in your rc file, Nash will report it:
+
+```
+nash: parse error: unexpected token at line 5
+```
+
+## Advanced Usage
+
+### Conditional RC Logic
+
+```bash ~/.nashrc
+# Load different configs based on environment
+test -n "$DEBUG" && echo "Debug mode enabled"
+test -d /project && cd /project || cd $HOME
+```
+
+### Multiple RC Files
+
+You can source additional files from within an rc file:
+
+```bash ~/.nashrc
+# Main rc file
+export USER=alice
+
+# Source additional config if it exists (VFS)
+test -f /etc/nash.conf && . /etc/nash.conf
+```
+
+<Warning>
+Nash does not support the `source` or `.` builtin for sourcing files. Each line is executed independently. Use rc files for initialization only.
+</Warning>
+
+### Environment-Specific RC Files
+
+```bash
+# Development
+nash --rcfile dev.nashrc
+
+# Testing
+nash --rcfile test.nashrc
+
+# Production
+nash --rcfile prod.nashrc
+```
+
+## Example: Full Development Setup
+
+Create a comprehensive `dev.nashrc`:
+
+```bash dev.nashrc
+#!/usr/bin/env nash
+# Development environment for Nash projects
+
+# Environment
+export NODE_ENV=development
+export DEBUG=true
+export LOG_LEVEL=debug
+export API_URL=http://localhost:3000
+
+# Paths
+export PROJECT_ROOT=/workspace
+export SRC_DIR=/workspace/src
+export TEST_DIR=/workspace/tests
+export BUILD_DIR=/workspace/dist
+
+# Create directory structure
+mkdir -p $SRC_DIR
+mkdir -p $TEST_DIR
+mkdir -p $BUILD_DIR
+mkdir -p /tmp/logs
+mkdir -p /tmp/cache
+
+echo "Development environment loaded!"
+echo "Project root: $PROJECT_ROOT"
+echo "API endpoint: $API_URL"
+```
+
+Run:
+
+```bash
+nash --rcfile dev.nashrc -B ./project:/workspace -C /workspace
+```
+
+## See Also
+
+- [CLI Flags](/usage/cli-flags) - All command-line options
+- [Interactive Mode](/usage/interactive-mode) - Using the Nash REPL
+- [Script Execution](/usage/script-execution) - Running Nash scripts

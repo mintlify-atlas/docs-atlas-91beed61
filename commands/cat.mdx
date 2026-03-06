@@ -1,0 +1,155 @@
+---
+title: cat
+description: Concatenate and print files or standard input
+icon: file-lines
+---
+
+## Syntax
+
+```bash
+cat [FILE...]
+```
+
+## Description
+
+The `cat` command reads one or more files and writes their contents to standard output. When called without arguments, it reads from standard input and echoes it to standard output, making it useful in pipelines.
+
+<Note>
+In Nash, `cat` operates entirely within the virtual filesystem (VFS). It never accesses the host system unless you've mounted a directory with `--bind`.
+</Note>
+
+## Parameters
+
+<ParamField path="FILE" type="string" optional>
+  Path to file(s) to read. Can be relative to current directory or absolute. If omitted, reads from standard input.
+</ParamField>
+
+## Behavior
+
+- **No arguments**: Reads from stdin and writes to stdout (pass-through mode)
+- **One or more files**: Concatenates all files in order and writes to stdout
+- **Flags**: Any arguments starting with `-` are silently ignored
+- **Error handling**: If any file cannot be read, returns exit code 1 with error message
+
+## Examples
+
+### Display a single file
+
+```bash
+cat welcome.txt
+```
+
+```
+Welcome to Nash!
+
+Nash is a sandboxed bash-like shell written in Rust.
+```
+
+### Concatenate multiple files
+
+```bash
+cat header.txt body.txt footer.txt > page.html
+```
+
+### Use as stdin pass-through
+
+```bash
+echo "hello world" | cat | grep hello
+```
+
+```
+hello world
+```
+
+### Create a file from stdin
+
+```bash
+cat > newfile.txt
+Type your content here
+Press Ctrl-D when done
+```
+
+### Append to a file
+
+```bash
+cat additional.txt >> existing.txt
+```
+
+## Error Handling
+
+### File not found
+
+```bash
+cat nonexistent.txt
+```
+
+```
+cat: nonexistent.txt: No such file or directory
+```
+
+Exit code: `1`
+
+### Permission denied (read-only mount)
+
+```bash
+# If /data is mounted read-only
+cat /data/protected.txt
+```
+
+If the file exists but cannot be read, `cat` will return an error describing the issue.
+
+## Implementation Details
+
+- Source: `src/builtins/cat.rs`
+- Reads entire file contents into memory using `vfs.read_to_string()`
+- Processes files sequentially in the order provided
+- Concatenates outputs without separators
+- Flags starting with `-` are filtered out but not validated
+
+<Warning>
+Unlike Unix `cat`, Nash's implementation doesn't support flags like `-n` (line numbers), `-b` (number non-blank lines), or `-v` (show non-printing characters). These are silently ignored.
+</Warning>
+
+## Differences from Unix cat
+
+| Feature | Unix cat | Nash cat |
+|---------|----------|----------|
+| Multiple files | ✅ Supported | ✅ Supported |
+| Stdin passthrough | ✅ Supported | ✅ Supported |
+| `-n` (line numbers) | ✅ Supported | ❌ Ignored |
+| `-b` (number non-blank) | ✅ Supported | ❌ Ignored |
+| `-v` (show non-printing) | ✅ Supported | ❌ Ignored |
+| `-E` (show line ends) | ✅ Supported | ❌ Ignored |
+| Large files | Streams | Loads into memory |
+
+## Use Cases
+
+### View file contents
+```bash
+cat config.json
+```
+
+### Combine multiple files
+```bash
+cat part1.txt part2.txt part3.txt > complete.txt
+```
+
+### Pipeline processing
+```bash
+cat data.txt | grep ERROR | sort | uniq -c
+```
+
+### Here document simulation
+```bash
+cat > script.sh
+#!/bin/nash
+echo "Hello from Nash"
+```
+
+## Related Commands
+
+- [`head`](/commands/head-tail) - Display first lines of a file
+- [`tail`](/commands/head-tail) - Display last lines of a file
+- [`grep`](/commands/grep) - Filter file contents by pattern
+- [`file`](/commands/file) - Determine file type
+- [`stat`](/commands/stat) - Display file status information

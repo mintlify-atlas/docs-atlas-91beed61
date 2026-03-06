@@ -1,0 +1,331 @@
+---
+title: Pipes and Redirections
+description: Master data flow between commands using pipes, input, and output redirection
+---
+
+Nash supports the full suite of Unix pipe and redirection operators, allowing you to build powerful command pipelines.
+
+## Simple Pipes
+
+Pipes (`|`) connect the output of one command to the input of another.
+
+<Steps>
+  <Step title="Basic pipe">
+    Filter output with grep:
+
+    ```bash
+    user@nash:/home/user$ cat welcome.txt | grep Nash
+    Welcome to Nash!
+    ```
+  </Step>
+
+  <Step title="Count lines">
+    ```bash
+    user@nash:/home/user$ ls | wc -l
+    5
+    ```
+  </Step>
+
+  <Step title="Search environment variables">
+    ```bash
+    user@nash:/home/user$ env | grep USER
+    USER=user
+    LOGNAME=user
+    ```
+  </Step>
+</Steps>
+
+## Chained Pipes
+
+You can chain multiple commands together for complex data processing.
+
+### Example: Text Processing Pipeline
+
+```bash
+user@nash:/home/user$ echo "apple\nbanana\napple\ncherry\nbanana\napple" > fruits.txt
+user@nash:/home/user$ cat fruits.txt
+apple
+banana
+apple
+cherry
+banana
+apple
+
+user@nash:/home/user$ cat fruits.txt | sort | uniq -c
+      3 apple
+      2 banana
+      1 cherry
+```
+
+<Tip>
+  The pipeline `sort | uniq` is a common pattern: sort groups identical lines together, then uniq removes duplicates.
+</Tip>
+
+### Example: Log Analysis
+
+```bash
+user@nash:/home/user$ cat > access.log
+192.168.1.1 GET /api/users
+192.168.1.2 POST /api/login
+192.168.1.1 GET /api/posts
+192.168.1.3 GET /api/users
+192.168.1.1 DELETE /api/posts/5
+
+user@nash:/home/user$ cat access.log | grep GET | wc -l
+3
+
+user@nash:/home/user$ cat access.log | grep "192.168.1.1" | wc -l
+3
+
+user@nash:/home/user$ cat access.log | cut -d' ' -f1 | sort | uniq -c
+      3 192.168.1.1
+      1 192.168.1.2
+      1 192.168.1.3
+```
+
+### Example: Finding and Filtering
+
+```bash
+user@nash:/home/user$ mkdir -p projects/{frontend,backend,docs}
+user@nash:/home/user$ touch projects/frontend/app.js
+user@nash:/home/user$ touch projects/frontend/styles.css
+user@nash:/home/user$ touch projects/backend/server.js
+user@nash:/home/user$ touch projects/docs/README.md
+
+user@nash:/home/user$ find projects -type f | grep "\.js$"
+projects/frontend/app.js
+projects/backend/server.js
+
+user@nash:/home/user$ find projects -type f | grep -v "README" | wc -l
+3
+```
+
+## Output Redirection
+
+### Write to File (`>`)
+
+The `>` operator redirects output to a file, **overwriting** existing content:
+
+```bash
+user@nash:/home/user$ echo "First line" > output.txt
+user@nash:/home/user$ cat output.txt
+First line
+
+user@nash:/home/user$ echo "Replaced content" > output.txt
+user@nash:/home/user$ cat output.txt
+Replaced content
+```
+
+### Append to File (`>>`)
+
+The `>>` operator redirects output to a file, **appending** to existing content:
+
+```bash
+user@nash:/home/user$ echo "Line 1" > log.txt
+user@nash:/home/user$ echo "Line 2" >> log.txt
+user@nash:/home/user$ echo "Line 3" >> log.txt
+user@nash:/home/user$ cat log.txt
+Line 1
+Line 2
+Line 3
+```
+
+### Building Files Incrementally
+
+<CodeGroup>
+```bash Create config file
+user@nash:/home/user$ echo "# Application Config" > config.txt
+user@nash:/home/user$ echo "PORT=8080" >> config.txt
+user@nash:/home/user$ echo "HOST=localhost" >> config.txt
+user@nash:/home/user$ echo "DEBUG=true" >> config.txt
+user@nash:/home/user$ cat config.txt
+# Application Config
+PORT=8080
+HOST=localhost
+DEBUG=true
+```
+
+```bash Collect data
+user@nash:/home/user$ ls > file_list.txt
+user@nash:/home/user$ echo "---" >> file_list.txt
+user@nash:/home/user$ env | grep USER >> file_list.txt
+user@nash:/home/user$ cat file_list.txt
+Desktop
+Documents
+Downloads
+welcome.txt
+---
+USER=user
+LOGNAME=user
+```
+</CodeGroup>
+
+## Input Redirection
+
+The `<` operator reads input from a file:
+
+```bash
+user@nash:/home/user$ echo "line1\nline2\nline3" > input.txt
+user@nash:/home/user$ cat < input.txt
+line1
+line2
+line3
+
+user@nash:/home/user$ grep "line2" < input.txt
+line2
+```
+
+## Complex Pipeline Examples
+
+### Example 1: Word Frequency Analysis
+
+```bash
+user@nash:/home/user$ cat > story.txt
+the cat sat on the mat
+the dog sat on the log
+the cat and the dog
+
+user@nash:/home/user$ cat story.txt | sed 's/ /\n/g' | sort | uniq -c | sort -r
+      5 the
+      2 sat
+      2 on
+      2 cat
+      2 dog
+      1 mat
+      1 log
+      1 and
+```
+
+<Steps>
+  <Step title="Read the file">
+    `cat story.txt` reads the content
+  </Step>
+  <Step title="Split into words">
+    `sed 's/ /\n/g'` replaces spaces with newlines (one word per line)
+  </Step>
+  <Step title="Sort alphabetically">
+    `sort` groups identical words together
+  </Step>
+  <Step title="Count occurrences">
+    `uniq -c` counts each unique word
+  </Step>
+  <Step title="Sort by frequency">
+    `sort -r` sorts in reverse (highest count first)
+  </Step>
+</Steps>
+
+### Example 2: File Statistics
+
+```bash
+user@nash:/home/user$ find /home/user -type f | wc -l > stats.txt
+user@nash:/home/user$ echo "---" >> stats.txt
+user@nash:/home/user$ find /home/user -type d | wc -l >> stats.txt
+user@nash:/home/user$ cat stats.txt
+8
+---
+5
+```
+
+### Example 3: Data Extraction
+
+```bash
+user@nash:/home/user$ cat > users.csv
+name,email,role
+alice,alice@example.com,admin
+bob,bob@example.com,user
+charlie,charlie@example.com,user
+
+user@nash:/home/user$ cat users.csv | grep -v "^name" | cut -d',' -f2
+alice@example.com
+bob@example.com
+charlie@example.com
+
+user@nash:/home/user$ cat users.csv | grep "admin" | cut -d',' -f1,2
+alice,alice@example.com
+```
+
+### Example 4: Filtered File List
+
+```bash
+user@nash:/home/user$ mkdir -p src/{js,css,images}
+user@nash:/home/user$ touch src/js/app.js src/js/utils.js
+user@nash:/home/user$ touch src/css/main.css src/css/theme.css
+user@nash:/home/user$ touch src/images/logo.png
+
+user@nash:/home/user$ find src -type f | sort
+src/css/main.css
+src/css/theme.css
+src/images/logo.png
+src/js/app.js
+src/js/utils.js
+
+user@nash:/home/user$ find src -name "*.js" | sort > js_files.txt
+user@nash:/home/user$ find src -name "*.css" | sort >> css_files.txt
+user@nash:/home/user$ cat js_files.txt
+src/js/app.js
+src/js/utils.js
+```
+
+## Combining Pipes and Redirections
+
+You can mix pipes and redirections in sophisticated ways:
+
+```bash
+user@nash:/home/user$ cat data.txt | grep "error" | sort | uniq > errors.txt
+
+user@nash:/home/user$ cat access.log | grep "GET" | cut -d' ' -f3 | sort | uniq -c > popular_endpoints.txt
+
+user@nash:/home/user$ find . -name "*.txt" | grep -v "test" | sort >> file_inventory.txt
+```
+
+## Real-World Session
+
+```bash
+user@nash:/home/user$ mkdir analysis && cd analysis
+
+user@nash:/home/user/analysis$ cat > sales.csv
+date,product,amount
+2024-01-01,laptop,1200
+2024-01-02,mouse,25
+2024-01-02,laptop,1200
+2024-01-03,keyboard,80
+2024-01-03,mouse,25
+
+user@nash:/home/user/analysis$ cat sales.csv | grep -v "^date"
+2024-01-01,laptop,1200
+2024-01-02,mouse,25
+2024-01-02,laptop,1200
+2024-01-03,keyboard,80
+2024-01-03,mouse,25
+
+user@nash:/home/user/analysis$ cat sales.csv | grep -v "^date" | cut -d',' -f2 | sort | uniq
+keyboard
+laptop
+mouse
+
+user@nash:/home/user/analysis$ cat sales.csv | grep -v "^date" | cut -d',' -f2 | sort | uniq -c | sort -r
+      2 mouse
+      2 laptop
+      1 keyboard
+
+user@nash:/home/user/analysis$ cat sales.csv | grep "laptop" | wc -l
+2
+
+user@nash:/home/user/analysis$ cat sales.csv | grep "laptop" > laptop_sales.txt
+user@nash:/home/user/analysis$ cat laptop_sales.txt
+2024-01-01,laptop,1200
+2024-01-02,laptop,1200
+```
+
+## Redirection Operators
+
+| Operator | Description | Behavior |
+|----------|-------------|----------|
+| `\|` | Pipe | Connects stdout of left command to stdin of right |
+| `>` | Output redirect | Writes stdout to file (overwrites) |
+| `>>` | Append redirect | Appends stdout to file |
+| `<` | Input redirect | Reads file content as stdin |
+
+<Tip>
+  Remember: `>` replaces, `>>` appends. Use `>` when starting fresh, `>>` when accumulating data.
+</Tip>

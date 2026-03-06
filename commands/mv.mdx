@@ -1,0 +1,200 @@
+---
+title: mv
+description: Move or rename files and directories
+icon: arrows-rotate
+---
+
+## Syntax
+
+```bash
+mv SOURCE DEST
+```
+
+## Description
+
+The `mv` command moves or renames files and directories within Nash's virtual filesystem. Unlike `cp`, this is a true move operation - the source is removed after the destination is created.
+
+<Note>
+In Nash's VFS, `mv` is implemented using `vfs.rename()` which is an atomic operation within the in-memory filesystem.
+</Note>
+
+## Parameters
+
+<ParamField path="SOURCE" type="string" required>
+  Path to the source file or directory to move. Can be relative or absolute.
+</ParamField>
+
+<ParamField path="DEST" type="string" required>
+  Destination path. If this is an existing directory, the source will be moved into it with its original name. Otherwise, the source is renamed to this path.
+</ParamField>
+
+## Behavior
+
+- **Rename file**: `mv old.txt new.txt` renames the file
+- **Move to directory**: `mv file.txt dir/` moves file into directory as `dir/file.txt`
+- **Move directory**: Works with both files and directories
+- **Atomic operation**: The move/rename is a single VFS operation
+- **Flag handling**: Arguments starting with `-` are filtered out but not validated
+
+## Examples
+
+### Rename a file
+
+```bash
+mv old_name.txt new_name.txt
+```
+
+### Move file to a directory
+
+```bash
+mv report.txt Documents/
+```
+
+The file is moved to `Documents/report.txt` (original name preserved).
+
+### Rename a directory
+
+```bash
+mv old_folder new_folder
+```
+
+### Move multiple files with a script
+
+```bash
+for f in *.txt; do
+  mv "$f" archive/
+done
+```
+
+### Move with absolute paths
+
+```bash
+mv /tmp/temp_file.txt /home/user/permanent.txt
+```
+
+### Organize files by moving
+
+```bash
+mkdir -p sorted/docs sorted/images
+mv *.txt sorted/docs/
+mv *.png sorted/images/
+```
+
+## Error Handling
+
+### Missing destination
+
+```bash
+mv source.txt
+```
+
+```
+mv: missing destination operand
+```
+
+Exit code: `1`
+
+### Source doesn't exist
+
+```bash
+mv nonexistent.txt somewhere.txt
+```
+
+Returns an error from the VFS layer indicating the source file doesn't exist.
+
+### Destination already exists
+
+If the destination path exists as a file (not a directory), `mv` will overwrite it without prompting.
+
+<Warning>
+`mv` will silently overwrite destination files. There is no `-i` (interactive) flag to prompt before overwriting.
+</Warning>
+
+## Implementation Details
+
+- Source: `src/builtins/mv.rs`
+- Uses `vfs.rename()` for the actual move operation
+- Only processes the first non-flag argument as source
+- Automatically detects if destination is a directory using `vfs.is_dir()`
+- Preserves basename when moving into directories using `VfsPath::basename()`
+- Does not support moving multiple files in a single command
+
+<Note>
+Unlike Unix `mv`, Nash's implementation only accepts a single source file. To move multiple files, use a loop or script.
+</Note>
+
+## Differences from Unix mv
+
+| Feature | Unix mv | Nash mv |
+|---------|---------|----------|
+| Rename file | ✅ Supported | ✅ Supported |
+| Move to directory | ✅ Supported | ✅ Supported |
+| Move directory | ✅ Supported | ✅ Supported |
+| Multiple sources | ✅ Supported | ❌ Single source only |
+| `-i` (interactive) | ✅ Supported | ❌ Not supported |
+| `-v` (verbose) | ✅ Supported | ❌ Not supported |
+| `-n` (no-clobber) | ✅ Supported | ❌ Not supported |
+| `-f` (force) | ✅ Supported | ❌ Not applicable |
+| Cross-filesystem | Copies then deletes | Always in-memory |
+
+## Use Cases
+
+### Rename for clarity
+```bash
+mv tmp.txt final_report.txt
+```
+
+### Organize downloads
+```bash
+mkdir -p ~/Documents/PDFs
+mv *.pdf ~/Documents/PDFs/
+```
+
+### Restructure project
+```bash
+mkdir -p src/lib src/bin
+mv *.rs src/lib/
+mv main.rs src/bin/
+```
+
+### Atomic file updates
+```bash
+# Write to temp, then atomically replace
+echo "new config" > config.json.tmp
+mv config.json.tmp config.json
+```
+
+### Move from mounted directory
+```bash
+# Launch Nash with: nash --bind ./uploads:/uploads
+mv /uploads/new_file.txt /home/user/processed/
+```
+
+## Common Patterns
+
+### Backup and replace
+```bash
+mv important.txt important.txt.old
+cp new_version.txt important.txt
+```
+
+### Clean up after processing
+```bash
+cat input.txt | grep ERROR > errors.txt
+mv input.txt processed/
+```
+
+### Batch rename with loop
+```bash
+for file in *.log; do
+  mv "$file" "archived_$file"
+done
+```
+
+## Related Commands
+
+- [`cp`](/commands/cp) - Copy files (source remains)
+- [`rm`](/commands/rm) - Remove files
+- [`ls`](/commands/ls) - List directory contents
+- [`mkdir`](/commands/mkdir) - Create directories
+- [`stat`](/commands/stat) - Check file information

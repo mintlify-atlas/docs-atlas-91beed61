@@ -1,0 +1,429 @@
+---
+title: uniq
+description: Filter adjacent duplicate lines
+---
+
+## Syntax
+
+```bash
+uniq [OPTIONS] [FILE...]
+```
+
+## Description
+
+The `uniq` command filters out adjacent duplicate lines from input. It's most commonly used after `sort` to remove all duplicates from a dataset, or to count how many times each unique line appears.
+
+**Important**: `uniq` only removes adjacent duplicates. To remove all duplicates regardless of position, pipe through `sort` first.
+
+Nash's `uniq` operates in-memory and supports counting, showing only duplicates, or showing only unique lines.
+
+## Options
+
+<ParamField path="-c" type="flag">
+  Count mode. Prefix each output line with the number of times it appeared consecutively.
+  
+  Output format: 7-space right-aligned count, followed by space and the line.
+</ParamField>
+
+<ParamField path="-d" type="flag">
+  Duplicates only. Output only lines that appear more than once (consecutively).
+</ParamField>
+
+<ParamField path="-u" type="flag">
+  Unique only. Output only lines that appear exactly once (no consecutive duplicates).
+</ParamField>
+
+<Note>
+Flags `-d` and `-u` are mutually exclusive. If both are specified, `-d` takes precedence.
+</Note>
+
+## Examples
+
+### Basic duplicate removal
+
+```bash
+echo -e "apple\napple\nbanana\nbanana\nbanana\ncherry" | uniq
+```
+
+<CodeGroup>
+```bash Output
+apple
+banana
+cherry
+```
+</CodeGroup>
+
+### Count consecutive occurrences
+
+```bash
+echo -e "apple\napple\nbanana\nbanana\nbanana\ncherry" | uniq -c
+```
+
+<CodeGroup>
+```bash Output
+      2 apple
+      3 banana
+      1 cherry
+```
+</CodeGroup>
+
+### Show only duplicates
+
+```bash
+echo -e "apple\napple\nbanana\ncherry" | uniq -d
+```
+
+<CodeGroup>
+```bash Output
+apple
+```
+</CodeGroup>
+
+Only "apple" appears more than once consecutively.
+
+### Show only unique lines
+
+```bash
+echo -e "apple\napple\nbanana\ncherry" | uniq -u
+```
+
+<CodeGroup>
+```bash Output
+banana
+cherry
+```
+</CodeGroup>
+
+Lines that appear exactly once.
+
+### Non-adjacent duplicates
+
+```bash
+echo -e "apple\nbanana\napple" | uniq
+```
+
+<CodeGroup>
+```bash Output
+apple
+banana
+apple
+```
+</CodeGroup>
+
+<Note>
+Notice "apple" appears twice in output because the duplicates are not adjacent. Use `sort | uniq` to remove all duplicates.
+</Note>
+
+### Complete deduplication
+
+```bash
+echo -e "apple\nbanana\napple\ncherry\nbanana" | sort | uniq
+```
+
+<CodeGroup>
+```bash Output
+apple
+banana
+cherry
+```
+</CodeGroup>
+
+## Pipeline Examples
+
+### Count unique IP addresses
+
+```bash
+cat access.log | cut -d' ' -f1 | sort | uniq -c | sort -r
+```
+
+1. Extract IP addresses
+2. Sort them
+3. Count each unique IP
+4. Sort by count (most frequent first)
+
+### Find duplicate entries
+
+```bash
+cat emails.txt | sort | uniq -d
+```
+
+Shows emails that appear more than once.
+
+### Find unique entries
+
+```bash
+cat transactions.txt | sort | uniq -u
+```
+
+Shows transactions that appear exactly once.
+
+### Most frequent errors
+
+```bash
+grep ERROR app.log | sort | uniq -c | sort -rn | head -10
+```
+
+Shows top 10 most common error messages.
+
+### Remove duplicates from sorted data
+
+```bash
+sort data.txt | uniq > unique-data.txt
+```
+
+Or use `sort -u` for the same effect:
+
+```bash
+sort -u data.txt > unique-data.txt
+```
+
+## Practical Use Cases
+
+### Deduplicate email list
+
+```bash
+cat emails.txt | sort | uniq > unique-emails.txt
+```
+
+### Find repeated log entries
+
+```bash
+cat system.log | sort | uniq -d
+```
+
+Identifies repeated messages (potential issues).
+
+### Count word frequency
+
+```bash
+cat document.txt | tr ' ' '\n' | sort | uniq -c | sort -rn
+```
+
+1. Split into words (one per line)
+2. Sort alphabetically
+3. Count each word
+4. Sort by frequency
+
+### Verify data consistency
+
+```bash
+cat data.csv | cut -d, -f1 | sort | uniq -d
+```
+
+Finds duplicate IDs in first column.
+
+### Create unique tag list
+
+```bash
+cat articles.txt | grep tags: | sed 's/tags: //' | tr ',' '\n' | sort | uniq
+```
+
+Extracts and deduplicates all tags.
+
+### Compare file contents
+
+```bash
+cat file1.txt file2.txt | sort | uniq -d
+```
+
+Shows lines that appear in both files.
+
+## Advanced Examples
+
+### Top 10 most common items
+
+```bash
+cat data.txt | sort | uniq -c | sort -rn | head -10
+```
+
+### Bottom 10 least common items
+
+```bash
+cat data.txt | sort | uniq -c | sort -n | head -10
+```
+
+### Items appearing exactly N times
+
+```bash
+cat data.txt | sort | uniq -c | grep "^      3 "
+```
+
+Finds items appearing exactly 3 times.
+
+### Frequency distribution
+
+```bash
+cat data.txt | sort | uniq -c | sort -rn
+```
+
+Complete frequency table, most to least common.
+
+### Find singletons and duplicates
+
+```bash
+echo "Unique entries:"
+cat data.txt | sort | uniq -u
+echo "\nDuplicate entries:"
+cat data.txt | sort | uniq -d
+```
+
+## Count Format Details
+
+The `-c` flag outputs counts right-aligned in a 7-character field:
+
+```bash
+echo -e "a\na\na" | uniq -c
+```
+
+<CodeGroup>
+```bash Output
+      3 a
+```
+</CodeGroup>
+
+Format: `[7 spaces for number] [line content]`
+
+## Comparison with sort -u
+
+<Tabs>
+  <Tab title="uniq">
+    ```bash
+    echo -e "b\na\nb" | uniq
+    ```
+    
+    Output:
+    ```
+    b
+    a
+    b
+    ```
+    
+    Only removes adjacent duplicates.
+  </Tab>
+  
+  <Tab title="sort | uniq">
+    ```bash
+    echo -e "b\na\nb" | sort | uniq
+    ```
+    
+    Output:
+    ```
+    a
+    b
+    ```
+    
+    Removes all duplicates.
+  </Tab>
+  
+  <Tab title="sort -u">
+    ```bash
+    echo -e "b\na\nb" | sort -u
+    ```
+    
+    Output:
+    ```
+    a
+    b
+    ```
+    
+    Same as `sort | uniq`, more efficient.
+  </Tab>
+</Tabs>
+
+## Tips
+
+### Always sort first
+
+For complete deduplication:
+
+```bash
+# Wrong - may miss duplicates
+cat file.txt | uniq
+
+# Right - removes all duplicates
+cat file.txt | sort | uniq
+```
+
+### Counting technique
+
+To count all occurrences of each unique item:
+
+```bash
+sort data.txt | uniq -c
+```
+
+This is a fundamental pattern for frequency analysis.
+
+### Filter by frequency
+
+Show only items appearing more than once:
+
+```bash
+sort data.txt | uniq -c | grep -v "^      1 "
+```
+
+### Case sensitivity
+
+`uniq` is case-sensitive. "Apple" and "apple" are different:
+
+```bash
+echo -e "Apple\napple" | uniq  # Both appear
+```
+
+To ignore case, convert first:
+
+```bash
+cat file.txt | tr '[:upper:]' '[:lower:]' | sort | uniq
+```
+
+### Empty lines
+
+Empty lines are treated as distinct values:
+
+```bash
+echo -e "\n\na" | uniq -c
+```
+
+Output shows count for empty lines.
+
+## Common Patterns
+
+### Frequency histogram
+
+```bash
+cat data.txt | sort | uniq -c | sort -rn
+```
+
+Sorted by frequency, descending.
+
+### Find unique values
+
+```bash
+cat file.txt | sort -u
+```
+
+Equivalent to `sort | uniq`, more efficient.
+
+### Duplicates only with count
+
+```bash
+cat file.txt | sort | uniq -c | grep -v "^      1 "
+```
+
+Shows items appearing multiple times with counts.
+
+### Intersection of two files
+
+```bash
+cat file1.txt file2.txt | sort | uniq -d
+```
+
+Finds common lines.
+
+## Related Commands
+
+- [sort](/commands/sort) - Sort lines (required for complete deduplication)
+- [grep](/commands/grep) - Filter by pattern
+- [wc](/commands/wc) - Count lines/words
+- [cut](/commands/cut) - Extract fields before deduplication
+- [sed](/commands/sed) - Transform before deduplication

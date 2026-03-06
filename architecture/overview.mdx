@@ -1,0 +1,240 @@
+---
+title: Architecture Overview
+description: High-level architecture of Nash CLI and module organization
+---
+
+Nash is a **sandboxed, bash-like command interpreter** written in Rust that provides complete shell functionality without ever executing real system commands. This page explains Nash's high-level architecture and how its components work together.
+
+## Design Philosophy
+
+Nash achieves complete sandboxing through **structural enforcement**, not just policy:
+
+- `std::process::Command` is **never imported** anywhere in the codebase
+- All file I/O goes through the VFS API — host paths are unreachable without `--bind`
+- Read-only mounts reject writes at the VFS layer, not the command layer
+- Subshells run on a **cloned context** — environment mutations don't escape `( )`
+
+<Info>
+The zero-system-calls guarantee is enforced at compile time by simply not importing the necessary modules to spawn processes.
+</Info>
+
+## Module Organization
+
+Nash's source code is organized into five main modules, each with a clear responsibility:
+
+```
+src/
+├── main.rs
+├── cli.rs                  CLI flags, REPL, script runner
+├── parser/
+│   ├── mod.rs              parse() entrypoint + tests
+│   ├── ast.rs              Expr, Word, WordPart, RedirectMode
+│   └── lexer.rs            Hand-written tokenizer
+├── runtime/
+│   ├── executor.rs         AST walker — zero system calls
+│   ├── context.rs          cwd + env + VFS + history
+│   └── output.rs           Output { stdout, stderr, exit_code }
+├── vfs/
+│   ├── mod.rs              Virtual Filesystem API
+│   ├── node.rs             FsNode (File | Directory)
+│   ├── path.rs             normalize, join, parent, basename
+│   └── mount.rs            MountPoint + MountOptions
+└── builtins/
+    ├── mod.rs              Builtin trait + dispatch table
+    └── *.rs                One file per command (28 total)
+```
+
+## Separation of Concerns
+
+The parser and runtime are **completely decoupled**:
+
+<Accordion title="Parser (src/parser/)">
+The parser module converts raw shell input strings into an Abstract Syntax Tree (AST). It knows nothing about execution semantics.
+
+**Key files:**
+- `lexer.rs` — Tokenizes input into symbols like `Pipe`, `And`, `Word`, etc.
+- `ast.rs` — Defines `Expr`, `Word`, `WordPart`, and `RedirectMode` types
+- `mod.rs` — Recursive-descent parser that builds the AST
+
+**Responsibilities:**
+- Tokenization (handling quotes, escapes, operators)
+- AST construction (commands, pipes, redirects, chains)
+- Syntax validation
+</Accordion>
+
+<Accordion title="Runtime (src/runtime/)">
+The runtime module evaluates AST expressions and manages execution context. It knows nothing about syntax.
+
+**Key files:**
+- `executor.rs` — AST walker with zero system calls (src/runtime/executor.rs:1-716)
+- `context.rs` — Mutable session state (cwd, env, VFS, history)
+- `output.rs` — Command output structure
+
+**Responsibilities:**
+- AST traversal and evaluation
+- Word expansion (variables, command substitution)
+- Context management (working directory, environment)
+- Builtin dispatch
+</Accordion>
+
+<Accordion title="VFS (src/vfs/)">
+The Virtual Filesystem provides an in-memory Unix-like filesystem with optional host mounts.
+
+**Key files:**
+- `mod.rs` — Core VFS operations (read, write, mkdir, rm, list)
+- `node.rs` — `FsNode` enum (File | Directory)
+- `path.rs` — Path manipulation (normalize, join, parent, basename)
+- `mount.rs` — Host directory binding support
+
+**Responsibilities:**
+- In-memory file storage
+- Directory tree operations
+- Host mount overlay
+- Read-only mount enforcement
+</Accordion>
+
+<Accordion title="Builtins (src/builtins/)">
+Built-in commands that provide shell functionality without invoking external processes.
+
+**Structure:**
+- `mod.rs` — `Builtin` trait and dispatch table (src/builtins/mod.rs:38-82)
+- One `.rs` file per command (28 total)
+
+**Responsibilities:**
+- Implement all shell commands
+- Parse command-line arguments
+- Operate on Context and VFS
+- Return Output structure
+</Accordion>
+
+## Component Interaction
+
+Here's how data flows through Nash when executing a command:
+
+```
+┌─────────────────┐
+│  User Input     │  echo hello | grep hello
+│  (String)       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Lexer          │  Tokenize into symbols
+│  (lexer.rs)     │  [Word("echo"), Word("hello"), Pipe, ...]
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Parser         │  Build AST tree
+│  (mod.rs)       │  Expr::Pipe { left: Command{...}, right: Command{...} }
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Executor       │  Walk AST, evaluate each node
+│  (executor.rs)  │  - Expand words ($VAR, $(cmd))
+└────────┬────────┘  - Dispatch to builtins
+         │           - Manage pipes and redirects
+         ▼
+┌─────────────────┐
+│  Builtin        │  Execute command logic
+│  (cat.rs, etc)  │  - Read args from slice
+└────────┬────────┘  - Access Context (cwd, env, VFS)
+         │           - Return Output structure
+         ▼
+┌─────────────────┐
+│  VFS            │  File operations
+│  (mod.rs)       │  - In-memory nodes
+└────────┬────────┘  - Host mount overlay
+         │
+         ▼
+┌─────────────────┐
+│  Output         │  { stdout, stderr, exit_code }
+│  (output.rs)    │
+└─────────────────┘
+```
+
+## ASCII Architecture Diagram
+
+From the Nash README (README.md:348-371):
+
+```
+src/
+├── main.rs
+├── cli.rs                  CLI flags, REPL, script runner
+├── parser/
+│   ├── mod.rs              parse() entrypoint + tests
+│   ├── ast.rs              Expr, Word, WordPart, RedirectMode
+│   └── lexer.rs            Hand-written tokenizer
+├── runtime/
+│   ├── executor.rs         AST walker — zero system calls
+│   ├── context.rs          cwd + env + VFS + history
+│   └── output.rs           Output { stdout, stderr, exit_code }
+├── vfs/
+│   ├── mod.rs              Virtual Filesystem API
+│   ├── node.rs             FsNode (File | Directory)
+│   ├── path.rs             normalize, join, parent, basename
+│   └── mount.rs            MountPoint + MountOptions
+└── builtins/
+    ├── mod.rs              Builtin trait + dispatch table
+    └── *.rs                One file per command (28 total)
+```
+
+## Key Design Decisions
+
+### 1. Parser-Runtime Decoupling
+
+The parser produces an `Expr` tree and knows nothing about execution. The runtime walks the tree and knows nothing about syntax. This enables:
+
+- Independent testing of each layer
+- Easy addition of new syntax forms
+- Clear separation of concerns
+
+### 2. VFS-First Design
+
+All file operations go through the VFS API. Builtins never touch `std::fs` directly:
+
+```rust
+// From src/builtins/cat.rs:20
+let abs = VfsPath::join(&ctx.cwd, arg);
+match ctx.vfs.read_to_string(&abs) {
+    Ok(content) => out.push_str(&content),
+    Err(e) => return Ok(Output::error(1, "", &format!("cat: {}", e))),
+}
+```
+
+### 3. Trait-Based Builtin System
+
+Every builtin implements the same trait (src/builtins/mod.rs:38-41):
+
+```rust
+pub trait Builtin {
+    fn run(&self, args: &[String], ctx: &mut Context, stdin: &str) -> Result<Output>;
+}
+```
+
+Dispatch is a simple match statement (src/builtins/mod.rs:44-81) that maps command names to boxed trait objects.
+
+### 4. Context as Shared State
+
+The `Context` structure (src/runtime/context.rs:7-16) holds all mutable session state:
+
+```rust
+pub struct Context {
+    pub cwd: String,                    // Current working directory
+    pub env: IndexMap<String, String>,  // Environment variables
+    pub vfs: Vfs,                       // Virtual filesystem
+    pub history: Vec<String>,           // Command history
+}
+```
+
+Builtins receive a `&mut Context`, allowing them to modify environment, change directories, or write files.
+
+## Next Steps
+
+Explore the detailed architecture of each module:
+
+- [Parser](/architecture/parser) — Tokenization and AST construction
+- [Runtime](/architecture/runtime) — Execution model and context management
+- [VFS](/architecture/vfs) — Virtual filesystem implementation
+- [Builtins](/architecture/builtins) — Command implementation patterns

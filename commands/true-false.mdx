@@ -1,0 +1,395 @@
+---
+title: true / false
+description: Return success or failure exit codes
+---
+
+## Overview
+
+The `true` and `false` commands are utility commands that do nothing except return a specific exit status. `true` always succeeds (exit code 0), and `false` always fails (exit code 1). They are primarily used in conditional logic, loops, and testing.
+
+## Syntax
+
+```bash
+true
+false
+```
+
+## Description
+
+<Tabs>
+  <Tab title="true">
+    The `true` command:
+    - Performs no operation
+    - Always returns exit code `0` (success)
+    - Produces no output
+    - Accepts no arguments (arguments are ignored)
+  </Tab>
+  <Tab title="false">
+    The `false` command:
+    - Performs no operation
+    - Always returns exit code `1` (failure)
+    - Produces no output
+    - Accepts no arguments (arguments are ignored)
+  </Tab>
+</Tabs>
+
+## Exit Status
+
+<ParamField path="true" type="command">
+  Always returns `0` (success)
+  ```bash
+  true
+  echo $?
+  # Output: 0
+  ```
+</ParamField>
+
+<ParamField path="false" type="command">
+  Always returns `1` (failure)
+  ```bash
+  false
+  echo $?
+  # Output: 1
+  ```
+</ParamField>
+
+## Examples
+
+### Basic Usage
+
+<CodeGroup>
+```bash true
+true
+echo $?
+# Output: 0
+```
+
+```bash false
+false
+echo $?
+# Output: 1
+```
+</CodeGroup>
+
+### With && Operator
+
+```bash
+# Second command runs because first succeeds
+true && echo "This runs"
+# Output: This runs
+
+# Second command doesn't run because first fails
+false && echo "This won't run"
+# Output: (nothing)
+```
+
+### With || Operator
+
+```bash
+# Second command doesn't run because first succeeds
+true || echo "This won't run"
+# Output: (nothing)
+
+# Second command runs because first fails
+false || echo "This runs"
+# Output: This runs
+```
+
+### In Conditional Statements
+
+```bash
+if true; then
+  echo "Always executes"
+fi
+# Output: Always executes
+
+if false; then
+  echo "Never executes"
+else
+  echo "Always executes"
+fi
+# Output: Always executes
+```
+
+## Practical Use Cases
+
+### Infinite Loops
+
+```bash
+# Loop forever (until break or Ctrl-C)
+while true; do
+  echo "Processing..."
+  # do work
+  # break condition
+done
+```
+
+### Default Success/Failure
+
+```bash
+# Ensure script succeeds even if last command fails
+some_command || true
+
+# Ensure script fails for testing
+some_test_setup
+false  # Force failure for testing
+```
+
+### Placeholder Commands
+
+```bash
+# Temporarily disable a command during development
+# some_long_command --with-options
+true  # Placeholder while debugging
+```
+
+### Logic Testing
+
+```bash
+# Test conditional logic
+if false || true; then
+  echo "OR logic works"
+fi
+# Output: OR logic works
+
+if true && false; then
+  echo "Won't run"
+else
+  echo "AND logic works"
+fi
+# Output: AND logic works
+```
+
+### Safe Command Chains
+
+```bash
+# Continue even if optional command fails
+optional_command || true
+required_command  # This still runs
+```
+
+### No-op in Scripts
+
+```bash
+# Syntactic placeholder (like 'pass' in Python)
+if test -f config.json; then
+  true  # TODO: implement config loading
+else
+  echo "Using defaults"
+fi
+```
+
+### Testing Exit Status Handling
+
+```bash
+# Test error handling code
+if false; then
+  echo "This won't run"
+else
+  echo "Error handling works"
+fi
+# Output: Error handling works
+```
+
+## Advanced Examples
+
+### Loop Control
+
+```bash
+# Infinite loop with break condition
+COUNTER=0
+while true; do
+  echo "Count: $COUNTER"
+  COUNTER=$((COUNTER + 1))
+  test "$COUNTER" -ge 5 && break
+done
+# Output:
+# Count: 0
+# Count: 1
+# Count: 2
+# Count: 3
+# Count: 4
+```
+
+### Conditional Assignment
+
+```bash
+# Set variable based on condition
+SUCCESS=false
+some_command && SUCCESS=true
+
+if $SUCCESS; then
+  echo "Command succeeded"
+fi
+```
+
+### Default Behavior
+
+```bash
+# Provide fallback behavior
+complex_command || true
+echo "Script continues regardless"
+```
+
+### Circuit Breaker Pattern
+
+```bash
+# Stop on first failure
+step1 || false
+step2 || false
+step3 || false
+echo "All steps succeeded"
+```
+
+### Negation
+
+```bash
+# Logical NOT using !
+true && echo "true is true"
+# Output: true is true
+
+false || echo "false is false"
+# Output: false is false
+```
+
+## Comparison with test Command
+
+<Tabs>
+  <Tab title="true/false">
+    Fixed exit codes:
+    ```bash
+    true   # Always 0
+    false  # Always 1
+    ```
+  </Tab>
+  <Tab title="test">
+    Conditional exit codes:
+    ```bash
+    test -f file.txt   # 0 if exists, 1 if not
+    [ "$VAR" = "val" ] # 0 if equal, 1 if not
+    ```
+  </Tab>
+</Tabs>
+
+## Common Patterns
+
+### Continue on Error
+
+```bash
+# Ignore errors from optional cleanup
+rm temp.txt || true
+```
+
+### Ensure Loop Iteration
+
+```bash
+# Infinite service loop
+while true; do
+  echo "Service running..."
+  # service work
+  sleep 1
+done
+```
+
+### Stub Functions
+
+```bash
+# Placeholder for future implementation
+my_function() {
+  true  # TODO: implement this
+}
+```
+
+### Force Exit Code
+
+```bash
+# Ensure script exits with specific code
+some_complex_script
+true   # Always exit with 0
+# OR
+some_complex_script
+false  # Always exit with 1
+```
+
+### Short-circuit Evaluation
+
+```bash
+# Only run if all conditions met
+true && true && true && echo "All true"
+# Output: All true
+
+# Run if any condition met
+false || false || true || echo "Never reached"
+# Output: (nothing - short-circuited at true)
+```
+
+## Boolean Logic Examples
+
+```bash
+# AND truth table
+true && true && echo "T && T = T"      # Runs
+true && false && echo "T && F = F"     # Doesn't run
+false && true && echo "F && T = F"     # Doesn't run
+false && false && echo "F && F = F"    # Doesn't run
+
+# OR truth table
+true || true && echo "T || T = T"      # Runs
+true || false && echo "T || F = T"     # Runs
+false || true && echo "F || T = T"     # Runs
+false || false || echo "F || F = F"    # Runs (demonstrates F || F = F with echo)
+```
+
+## While Loop Patterns
+
+<CodeGroup>
+```bash Infinite loop
+while true; do
+  # runs forever
+done
+```
+
+```bash Never loop
+while false; do
+  # never runs
+done
+```
+
+```bash Conditional infinite loop
+while true; do
+  test -f stop.txt && break
+  # work here
+done
+```
+</CodeGroup>
+
+## Notes
+
+<Note>
+- Both commands accept any arguments but ignore them completely
+- No output is ever produced (stdout and stderr remain empty)
+- Useful for logic testing and script control flow
+- Common in shell scripting for loops and conditionals
+- Exit codes are guaranteed: `true` = 0, `false` = 1
+- Can be used as no-op (no operation) placeholders
+</Note>
+
+<Warning>
+Infinite loops with `while true` will run forever unless:
+- A `break` statement is executed
+- The script is killed (Ctrl-C)
+- An error occurs with `-e` shell option set
+- An exit command is called
+
+```bash
+# This will run forever!
+while true; do
+  echo "Infinite loop"
+done
+# Press Ctrl-C to stop
+```
+</Warning>
+
+## Related Commands
+
+- [`test`](/commands/test) - Evaluate conditional expressions
+- [`which`](/commands/which) - Check command availability

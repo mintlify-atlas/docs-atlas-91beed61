@@ -1,0 +1,351 @@
+---
+title: file
+description: Determine file type using magic bytes and extension heuristics
+icon: file-magnifying-glass
+---
+
+## Syntax
+
+```bash
+file FILE...
+```
+
+## Description
+
+The `file` command identifies the type of files by examining their contents (magic bytes) and file extensions. It's useful for determining what kind of data a file contains, especially when the extension is missing or misleading.
+
+<Note>
+Nash's `file` implementation uses a combination of magic byte detection (file signatures) and extension-based heuristics as a fallback.
+</Note>
+
+## Parameters
+
+<ParamField path="FILE" type="string" required>
+  One or more files to identify. Supports multiple files in a single command.
+</ParamField>
+
+## Behavior
+
+- **Magic byte detection**: Checks file headers for known signatures (ELF, PNG, JPEG, PDF, etc.)
+- **Shebang detection**: Identifies script files by their `#!` line
+- **Extension fallback**: Uses file extension when magic bytes don't match
+- **UTF-8 heuristic**: Classifies valid UTF-8 as "ASCII text"
+- **Binary data**: Anything that's not valid UTF-8 is "binary data"
+- **Directories**: Identified as "directory"
+
+## Supported File Types
+
+### Magic Byte Detection
+
+<ParamField path="ELF executable" type="detection">
+  Files starting with `\x7fELF`
+</ParamField>
+
+<ParamField path="PNG image data" type="detection">
+  Files starting with `\x89PNG`
+</ParamField>
+
+<ParamField path="JPEG image data" type="detection">
+  Files starting with `\xff\xd8\xff`
+</ParamField>
+
+<ParamField path="GIF image data" type="detection">
+  Files starting with `GIF8`
+</ParamField>
+
+<ParamField path="Zip archive data" type="detection">
+  Files starting with `PK\x03\x04`
+</ParamField>
+
+<ParamField path="PDF document" type="detection">
+  Files starting with `%PDF`
+</ParamField>
+
+<ParamField path="script" type="detection">
+  Files starting with `#!` (shebang), shows interpreter path
+</ParamField>
+
+### Extension-Based Detection
+
+| Extension | Identified Type |
+|-----------|----------------|
+| `.rs` | Rust source code |
+| `.toml` | TOML configuration |
+| `.json` | JSON data |
+| `.yaml`, `.yml` | YAML data |
+| `.md` | Markdown document |
+| `.txt` | ASCII text |
+| `.sh` | shell script |
+| `.py` | Python script |
+| `.js` | JavaScript source |
+| `.html` | HTML document |
+| `.css` | CSS stylesheet |
+
+## Examples
+
+### Identify a text file
+
+```bash
+file welcome.txt
+```
+
+```
+welcome.txt: ASCII text
+```
+
+### Identify by extension
+
+```bash
+file config.json
+```
+
+```
+config.json: JSON data
+```
+
+### Identify a script with shebang
+
+```bash
+echo "#!/bin/nash" > script.sh
+echo "echo hello" >> script.sh
+file script.sh
+```
+
+```
+script.sh: script (#!/bin/nash)
+```
+
+### Identify multiple files
+
+```bash
+file report.txt data.json image.png
+```
+
+```
+report.txt: ASCII text
+data.json: JSON data
+image.png: PNG image data
+```
+
+### Identify a directory
+
+```bash
+file Documents/
+```
+
+```
+Documents/: directory
+```
+
+### Identify binary data
+
+```bash
+# Create a file with binary content
+file unknown.bin
+```
+
+```
+unknown.bin: binary data
+```
+
+### Check file types in directory
+
+```bash
+ls | while read f; do file "$f"; done
+```
+
+```
+Desktop: directory
+Documents: directory
+config.json: JSON data
+welcome.txt: ASCII text
+```
+
+## Detection Priority
+
+1. **Directory check**: If path is a directory, return "directory"
+2. **Magic bytes**: Check file header for known signatures
+3. **Shebang**: If file starts with `#!`, identify as script
+4. **Extension**: Match file extension against known types
+5. **UTF-8 validation**: If content is valid UTF-8, return "ASCII text"
+6. **Fallback**: Return "binary data"
+
+## Error Handling
+
+### Missing operand
+
+```bash
+file
+```
+
+```
+file: missing operand
+```
+
+Exit code: `1`
+
+### File doesn't exist
+
+```bash
+file nonexistent.txt
+```
+
+```
+nonexistent.txt: cannot open (No such file or directory)
+```
+
+### Cannot read file
+
+If a file exists but cannot be read, the VFS error is caught and reported.
+
+## Implementation Details
+
+- Source: `src/builtins/file.rs`
+- Uses `vfs.exists()` and `vfs.is_dir()` for basic checks
+- Reads file bytes with `vfs.read()` for magic byte detection
+- Function `detect_type()` contains detection logic
+- Checks up to first 64 bytes for shebang lines
+- Uses Rust's `std::str::from_utf8()` for UTF-8 validation
+- Extension extracted using `rsplit('.')` and converted to lowercase
+
+<Note>
+The magic byte detection is limited to common formats. Specialized or less common file types may fall back to extension-based detection or "binary data".
+</Note>
+
+## Differences from Unix file
+
+| Feature | Unix file | Nash file |
+|---------|-----------|------------|
+| Magic bytes | 1000+ types | ~7 types |
+| MIME types | ✅ With `-i` | ❌ Not supported |
+| Compressed files | Looks inside | Detects as Zip |
+| Detailed info | Very detailed | Basic type |
+| Database | Uses magic.mgc | Hardcoded |
+| Symlinks | Follows/shows | VFS has no symlinks |
+| `-b` (brief) | ✅ Supported | Always brief |
+| `-i` (MIME) | ✅ Supported | ❌ Not supported |
+
+## Use Cases
+
+### Verify file before processing
+```bash
+if file data.txt | grep -q "ASCII text"; then
+  cat data.txt | grep ERROR
+fi
+```
+
+### Filter by file type
+```bash
+for f in *; do
+  if file "$f" | grep -q "JSON data"; then
+    echo "Processing JSON: $f"
+    jq . "$f"
+  fi
+done
+```
+
+### Identify scripts
+```bash
+find . -type f | while read f; do
+  if file "$f" | grep -q "script"; then
+    echo "Script found: $f"
+  fi
+done
+```
+
+### Check uploaded file type
+```bash
+# nash --bind ./uploads:/uploads
+file /uploads/new_file
+```
+
+### Distinguish text from binary
+```bash
+if file document.pdf | grep -q "binary\|PDF"; then
+  echo "Cannot cat binary file"
+else
+  cat document.pdf
+fi
+```
+
+## Common Patterns
+
+### Type-based processing
+```bash
+for file in *; do
+  type=$(file "$file" | cut -d: -f2)
+  echo "$file is $type"
+done
+```
+
+### Validate file types before import
+```bash
+#!/bin/nash
+for upload in uploads/*; do
+  type=$(file "$upload")
+  case "$type" in
+    *"JSON"*)
+      jq . "$upload" > validated/$(basename "$upload")
+      ;;
+    *"ASCII text"*)
+      cat "$upload" > validated/$(basename "$upload")
+      ;;
+    *)
+      echo "Unsupported type: $type"
+      ;;
+  esac
+done
+```
+
+### Find all images
+```bash
+find . -type f | while read f; do
+  if file "$f" | grep -q "image"; then
+    echo "$f"
+  fi
+done
+```
+
+### Safe file operations
+```bash
+if test -f input.dat; then
+  filetype=$(file input.dat | cut -d: -f2)
+  echo "Processing file of type: $filetype"
+fi
+```
+
+## Detection Examples
+
+### Various file types
+
+```bash
+user@nash:/home/user$ file *
+Documents: directory
+config.json: JSON data
+data.csv: ASCII text
+image.png: PNG image data
+script.sh: shell script
+README.md: Markdown document
+Cargo.toml: TOML configuration
+main.rs: Rust source code
+binary.dat: binary data
+```
+
+### Shebang detection
+
+```bash
+user@nash:/home/user$ cat deploy.sh
+#!/bin/bash
+echo "Deploying..."
+
+user@nash:/home/user$ file deploy.sh
+deploy.sh: script (#!/bin/bash)
+```
+
+## Related Commands
+
+- [`stat`](/commands/stat) - Display file status and size
+- [`ls`](/commands/ls) - List files
+- [`cat`](/commands/cat) - Display file contents
+- [`grep`](/commands/grep) - Search file contents
+- [`find`](/commands/find) - Find files by criteria

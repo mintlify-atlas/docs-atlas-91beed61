@@ -1,97 +1,119 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Nash
+description: A sandboxed, bash-like command interpreter for AI agents with full VFS isolation
 ---
 
-## Setting up
+<div className="text-center mb-8">
+  <h1 className="text-5xl font-bold mb-4" style={{color: '#1a1a1a'}}>
+    Nash — Not A Shell
+  </h1>
+  <p className="text-xl mb-6" style={{color: '#545454'}}>
+    A sandboxed bash-like command interpreter written in Rust
+  </p>
+  <div className="flex justify-center gap-4 mb-8">
+    <a 
+      href="/quickstart" 
+      className="px-6 py-3 rounded-md font-semibold text-sm"
+      style={{backgroundColor: '#94cb04', color: '#1a1a1a'}}
+    >
+      Get Started
+    </a>
+    <a 
+      href="https://github.com/sammwyy/nash" 
+      className="px-6 py-3 rounded-md font-semibold text-sm"
+      style={{backgroundColor: 'transparent', border: '2px solid #94cb04', color: '#1a1a1a'}}
+    >
+      View on GitHub
+    </a>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Why Nash?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Nash looks and behaves like a minimal Bash shell, but it **never executes real system commands or touches the host filesystem directly**. Everything runs inside a fully controlled in-memory Virtual Filesystem (VFS) with optional host-directory overlay via explicit mount bindings.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Fully Sandboxed" icon="shield-check">
+    Zero system calls, no OS shell spawned. Perfect for AI agents and untrusted code execution.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="In-Memory VFS" icon="hard-drive">
+    Realistic Unix directory tree scaffolded at boot with optional host mounts.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="28 Built-in Commands" icon="terminal">
+    grep, sed, find, jq, tree, cut, uniq, and more — all implemented in Rust.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Bash-Compatible" icon="code">
+    Pipes, redirections, &&, ||, subshells, quoting, $VAR, $(cmd) all work.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Quick Example
 
-Everything you need to create world-class documentation.
+```bash
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  welcome.txt
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+user@nash:/home/user$ echo "hello world" | grep hello
+hello world
 
-## Need inspiration?
+user@nash:/home/user$ mkdir projects && cd projects
+user@nash:/home/user/projects$ pwd
+/home/user/projects
+```
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Get Started
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Nash using Cargo and get up and running in minutes
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Learn the basics with a hands-on tutorial
+  </Card>
+  <Card title="Command Reference" icon="book" href="/commands/overview">
+    Explore all 28 built-in commands
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture/overview">
+    Deep dive into how Nash works internally
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={3}>
+  <Card title="Interactive REPL" icon="computer">
+    Colored bash-style prompt with readline history and Ctrl-C/D handling
+  </Card>
+  <Card title="Script Execution" icon="file-code">
+    Run .sh files directly or execute commands from stdin
+  </Card>
+  <Card title="Host Mounts" icon="folder-open">
+    Bind real directories read-write or read-only via --bind
+  </Card>
+  <Card title="Multi-User" icon="users">
+    Create isolated home directories for different users
+  </Card>
+  <Card title="Shell Flags" icon="flag">
+    Support for -e, -u, -x, -v and other bash-compatible flags
+  </Card>
+  <Card title="Zero Dependencies" icon="cube">
+    No dependencies beyond the Rust toolchain
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="AI Agent Sandboxing">
+    Give AI agents a safe shell environment where they can run commands without accessing your real filesystem or executing system processes.
+  </Accordion>
+  <Accordion title="Command Testing">
+    Test shell scripts in an isolated environment before running them on production systems.
+  </Accordion>
+  <Accordion title="Educational Tools">
+    Teach shell scripting concepts in a controlled environment where students can't accidentally damage the system.
+  </Accordion>
+  <Accordion title="CI/CD Pipelines">
+    Execute untrusted build scripts in a sandboxed environment with controlled access to specific directories.
+  </Accordion>
+</AccordionGroup>

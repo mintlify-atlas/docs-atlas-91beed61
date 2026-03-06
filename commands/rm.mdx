@@ -1,0 +1,251 @@
+---
+title: rm
+description: Remove files and directories from the virtual filesystem
+icon: trash
+---
+
+## Syntax
+
+```bash
+rm [OPTIONS] FILE...
+```
+
+## Description
+
+The `rm` command removes (deletes) files and directories from Nash's virtual filesystem. By default, it only removes files; use the `-r` flag to remove directories recursively.
+
+<Warning>
+Deletion is permanent within the VFS session. Nash doesn't have a trash/recycle bin. However, since Nash operates in-memory by default, all changes are lost when you exit unless you're working with `--bind` mounted directories.
+</Warning>
+
+## Options
+
+<ParamField path="-r" type="flag">
+  Remove directories and their contents recursively
+</ParamField>
+
+<ParamField path="-rf" type="flag">
+  Recursive and force (same as `-r` in Nash)
+</ParamField>
+
+<ParamField path="-R" type="flag">
+  Recursive (uppercase variant, same as `-r`)
+</ParamField>
+
+## Parameters
+
+<ParamField path="FILE" type="string" required>
+  One or more files or directories to remove. Supports multiple arguments.
+</ParamField>
+
+## Behavior
+
+- **Default mode**: Removes only files, not directories
+- **Recursive mode**: With `-r`, `-rf`, or `-R`, removes directories and all contents
+- **Multiple targets**: Can remove multiple files/directories in one command
+- **Unknown flags**: Other flags starting with `-` are silently ignored
+
+## Examples
+
+### Remove a single file
+
+```bash
+rm unwanted.txt
+```
+
+### Remove multiple files
+
+```bash
+rm file1.txt file2.txt file3.txt
+```
+
+### Remove all files matching a pattern
+
+```bash
+rm *.log
+```
+
+### Remove an empty directory (fails without -r)
+
+```bash
+mkdir empty_dir
+rm empty_dir  # This will fail
+```
+
+```
+Error: Cannot remove directory without -r flag
+```
+
+### Remove a directory recursively
+
+```bash
+rm -r old_project/
+```
+
+### Remove directory with all contents
+
+```bash
+mkdir -p test/nested/deep
+touch test/file1.txt test/nested/file2.txt
+rm -rf test/
+```
+
+### Remove with absolute paths
+
+```bash
+rm /tmp/temp_file.txt /tmp/cache/
+```
+
+## Error Handling
+
+### Missing operand
+
+```bash
+rm
+```
+
+```
+rm: missing operand
+```
+
+Exit code: `1`
+
+### File doesn't exist
+
+```bash
+rm nonexistent.txt
+```
+
+Returns an error from the VFS layer.
+
+### Directory without -r flag
+
+```bash
+rm my_directory/
+```
+
+Fails because directories require the `-r` flag.
+
+### Read-only mounted directory
+
+```bash
+# If /data is mounted with --bind-ro
+rm /data/file.txt
+```
+
+Fails with a permission error from the VFS layer.
+
+## Implementation Details
+
+- Source: `src/builtins/rm.rs`
+- Parses flags: `-r`, `-rf`, and `-R` enable recursive mode
+- Uses `vfs.remove()` for files and non-recursive removal
+- Uses `vfs.remove_recursive()` for recursive directory removal
+- Processes multiple targets in sequence
+- Unknown flags are silently ignored (not validated)
+
+<Note>
+The `-f` (force) flag in `-rf` doesn't add special behavior in Nash - it's treated the same as `-r`. There's no difference between `-r` and `-rf`.
+</Note>
+
+## Differences from Unix rm
+
+| Feature | Unix rm | Nash rm |
+|---------|---------|----------|
+| Remove files | ✅ Supported | ✅ Supported |
+| Remove directories | ✅ `-r` flag | ✅ `-r`, `-rf`, `-R` |
+| Multiple targets | ✅ Supported | ✅ Supported |
+| `-i` (interactive) | ✅ Supported | ❌ Not supported |
+| `-f` (force) | ✅ Ignore missing | ❌ Same as `-r` |
+| `-v` (verbose) | ✅ Supported | ❌ Not supported |
+| Wildcards | Shell expands | Shell expands |
+| Confirm prompts | With `-i` | Never |
+
+## Use Cases
+
+### Clean up temporary files
+```bash
+rm /tmp/*.tmp
+```
+
+### Remove build artifacts
+```bash
+rm -rf target/ dist/ build/
+```
+
+### Delete specific file types
+```bash
+find . -name "*.bak" | while read f; do rm "$f"; done
+```
+
+### Remove empty test directory
+```bash
+mkdir test
+rm -r test/
+```
+
+### Clean up after processing
+```bash
+cat input.txt | grep IMPORTANT > output.txt
+rm input.txt
+```
+
+## Common Patterns
+
+### Safe removal pattern (check first)
+```bash
+ls temp/
+# Verify contents
+rm -rf temp/
+```
+
+### Remove all except certain files
+```bash
+# Remove all .txt files except important.txt
+ls *.txt | grep -v important.txt | while read f; do rm "$f"; done
+```
+
+### Conditional removal
+```bash
+if test -f old_data.csv; then
+  rm old_data.csv
+fi
+```
+
+### Remove with confirmation script
+```bash
+#!/bin/nash
+echo "About to delete: $1"
+read -p "Continue? (y/n) " confirm
+if test "$confirm" = "y"; then
+  rm "$1"
+fi
+```
+
+## Safety Considerations
+
+<Warning>
+**Important Safety Notes:**
+
+- No confirmation prompts - files are deleted immediately
+- No `-i` interactive flag available
+- No trash/recycle bin - deletion is permanent (within session)
+- Wildcards expand at shell level - be careful with patterns
+- `-rf` combinations don't require confirmation
+</Warning>
+
+### Best Practices
+
+1. **Check before removing**: Use `ls` to verify targets
+2. **Test with echo**: `echo rm *.txt` to see what would be removed
+3. **Use absolute paths**: When in doubt about current directory
+4. **Backup important data**: Especially when using `-rf`
+5. **Start specific**: `rm file.txt` not `rm *` until you're sure
+
+## Related Commands
+
+- [`ls`](/commands/ls) - List files before removing
+- [`find`](/commands/find) - Find files to remove
+- [`mv`](/commands/mv) - Move instead of delete
+- [`mkdir`](/commands/mkdir) - Create directories
+- [`test`](/commands/test) - Check file existence conditionally

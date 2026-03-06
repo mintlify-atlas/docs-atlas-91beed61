@@ -1,0 +1,437 @@
+---
+title: wc
+description: Count lines, words, and bytes
+---
+
+## Syntax
+
+```bash
+wc [OPTIONS] [FILE...]
+```
+
+## Description
+
+The `wc` (word count) command counts lines, words, and bytes in text input. It's a fundamental tool for analyzing file sizes, counting records, and understanding text structure.
+
+By default, `wc` displays all three counts. You can specify flags to show only specific counts.
+
+Nash's `wc` operates entirely in-memory and supports reading from files or standard input.
+
+## Options
+
+<ParamField path="-l" type="flag">
+  Count lines only. Output the number of newline characters.
+</ParamField>
+
+<ParamField path="-w" type="flag">
+  Count words only. Words are whitespace-separated tokens.
+</ParamField>
+
+<ParamField path="-c" type="flag">
+  Count bytes only. Output the total number of bytes (characters).
+</ParamField>
+
+<Note>
+When no options are specified, `wc` displays lines, words, and bytes (in that order).
+When multiple options are specified, counts appear in the order: lines, words, bytes.
+</Note>
+
+## Examples
+
+### Default output (all counts)
+
+```bash
+echo -e "hello world\nfoo bar" | wc
+```
+
+<CodeGroup>
+```bash Output
+       2        4       20
+```
+</CodeGroup>
+
+Output format: `lines words bytes`
+
+- 2 lines
+- 4 words (hello, world, foo, bar)
+- 20 bytes
+
+### Count lines only
+
+```bash
+echo -e "line 1\nline 2\nline 3" | wc -l
+```
+
+<CodeGroup>
+```bash Output
+       3
+```
+</CodeGroup>
+
+### Count words only
+
+```bash
+echo "the quick brown fox" | wc -w
+```
+
+<CodeGroup>
+```bash Output
+       4
+```
+</CodeGroup>
+
+### Count bytes only
+
+```bash
+echo "hello" | wc -c
+```
+
+<CodeGroup>
+```bash Output
+       6
+```
+</CodeGroup>
+
+Note: Includes the newline character added by `echo`.
+
+### Multiple flags
+
+```bash
+echo -e "one two\nthree four" | wc -l -w
+```
+
+<CodeGroup>
+```bash Output
+       2        4
+```
+</CodeGroup>
+
+Shows lines and words (in that order).
+
+### Count file contents
+
+```bash
+echo -e "line 1\nline 2" > test.txt
+wc test.txt
+```
+
+<CodeGroup>
+```bash Output
+       2        4       14
+```
+</CodeGroup>
+
+## Pipeline Examples
+
+### Count matches
+
+```bash
+grep ERROR app.log | wc -l
+```
+
+Counts how many lines contain "ERROR".
+
+### Count unique values
+
+```bash
+cat data.txt | sort -u | wc -l
+```
+
+Counts unique lines in file.
+
+### Words in a document
+
+```bash
+cat article.txt | wc -w
+```
+
+Total word count.
+
+### File size approximation
+
+```bash
+cat large-file.txt | wc -c
+```
+
+Shows byte size.
+
+### Count after filtering
+
+```bash
+ls | grep "\.txt$" | wc -l
+```
+
+Counts `.txt` files in directory.
+
+### Average line length
+
+```bash
+BYTES=$(cat file.txt | wc -c)
+LINES=$(cat file.txt | wc -l)
+echo "Average: $((BYTES / LINES)) bytes per line"
+```
+
+## Practical Use Cases
+
+### Verify CSV row count
+
+```bash
+cat data.csv | wc -l
+```
+
+Quick check of record count.
+
+### Check if file is empty
+
+```bash
+test $(cat file.txt | wc -l) -eq 0 && echo "Empty file"
+```
+
+### Count log entries by level
+
+```bash
+echo "Errors: $(grep ERROR app.log | wc -l)"
+echo "Warnings: $(grep WARN app.log | wc -l)"
+echo "Info: $(grep INFO app.log | wc -l)"
+```
+
+### Estimate reading time
+
+```bash
+WORDS=$(cat article.txt | wc -w)
+MINS=$((WORDS / 200))
+echo "Estimated reading time: $MINS minutes"
+```
+
+### Monitor log growth
+
+```bash
+echo "Log size: $(cat app.log | wc -l) lines"
+```
+
+### Count code lines
+
+```bash
+cat *.js | grep -v "^$" | grep -v "^[ ]*//" | wc -l
+```
+
+Non-empty, non-comment lines.
+
+### Data validation
+
+```bash
+EXPECTED=1000
+ACTUAL=$(cat output.txt | wc -l)
+test $ACTUAL -eq $EXPECTED && echo "OK" || echo "Mismatch: $ACTUAL rows"
+```
+
+## Advanced Examples
+
+### Compare file sizes
+
+```bash
+echo "file1.txt: $(cat file1.txt | wc -c) bytes"
+echo "file2.txt: $(cat file2.txt | wc -c) bytes"
+```
+
+### Count fields in CSV
+
+```bash
+LINES=$(cat data.csv | wc -l)
+FIELDS=$(head -1 data.csv | tr ',' '\n' | wc -l)
+echo "$LINES rows × $FIELDS columns"
+```
+
+### Average words per line
+
+```bash
+LINES=$(cat doc.txt | wc -l)
+WORDS=$(cat doc.txt | wc -w)
+echo "Average: $((WORDS / LINES)) words/line"
+```
+
+### Multiple files
+
+```bash
+wc file1.txt file2.txt file3.txt
+```
+
+Shows counts for each file separately.
+
+### Conditional processing
+
+```bash
+if [ $(cat errors.log | wc -l) -gt 100 ]; then
+  echo "Too many errors!"
+fi
+```
+
+## Output Format
+
+All counts are right-aligned in 8-character fields:
+
+```bash
+echo "test" | wc
+```
+
+<CodeGroup>
+```bash Output
+       1        1        5
+```
+</CodeGroup>
+
+Format: `%8d` for each count.
+
+### Single count format
+
+```bash
+echo "test" | wc -l
+```
+
+<CodeGroup>
+```bash Output
+       1
+```
+</CodeGroup>
+
+### Multiple counts format
+
+```bash
+echo "test" | wc -l -c
+```
+
+<CodeGroup>
+```bash Output
+       1        5
+```
+</CodeGroup>
+
+Order is always: lines, words, bytes.
+
+## Understanding Counts
+
+<Tabs>
+  <Tab title="Lines">
+    Number of newline characters (`\n`).
+    
+    ```bash
+    echo -e "a\nb\nc" | wc -l
+    ```
+    
+    Output: `3`
+    
+    <Note>
+    Files without a trailing newline may count one fewer line than expected.
+    </Note>
+  </Tab>
+  
+  <Tab title="Words">
+    Number of whitespace-separated tokens.
+    
+    ```bash
+    echo "one two  three" | wc -w
+    ```
+    
+    Output: `3`
+    
+    Multiple spaces count as one separator.
+  </Tab>
+  
+  <Tab title="Bytes">
+    Total character count including newlines.
+    
+    ```bash
+    echo "abc" | wc -c
+    ```
+    
+    Output: `4` (3 letters + 1 newline)
+  </Tab>
+</Tabs>
+
+## Common Patterns
+
+### Count pipeline results
+
+```bash
+command | wc -l
+```
+
+Standard way to count output lines.
+
+### Check file emptiness
+
+```bash
+test $(cat file.txt | wc -l) -gt 0 && echo "Has content"
+```
+
+### Sum counts across files
+
+```bash
+wc -l *.txt
+```
+
+Shows individual and total counts.
+
+### Store count in variable
+
+```bash
+COUNT=$(cat data.txt | wc -l)
+echo "Found $COUNT records"
+```
+
+### Percentage calculation
+
+```bash
+TOTAL=$(cat all.txt | wc -l)
+FILTERED=$(cat all.txt | grep pattern | wc -l)
+PERCENT=$((FILTERED * 100 / TOTAL))
+echo "$PERCENT% match"
+```
+
+## Tips
+
+<Note>
+**Newline counting**: `wc -l` counts newline characters. A file without a trailing newline may show one fewer line than you expect.
+</Note>
+
+### Empty input
+
+```bash
+echo -n "" | wc -l  # Output: 0 (no newline)
+echo "" | wc -l     # Output: 1 (one newline)
+```
+
+### Word definition
+
+Words are separated by any whitespace: spaces, tabs, newlines.
+
+```bash
+echo -e "one\ttwo\nthree" | wc -w  # Output: 3
+```
+
+### Byte vs character
+
+For ASCII text, bytes = characters. For Unicode, may differ (not applicable in Nash's VFS).
+
+### Combining with other commands
+
+Always use `wc` at the end of pipelines:
+
+```bash
+grep pattern file | sort | uniq | wc -l
+```
+
+## Performance
+
+<Note>
+Nash's `wc` loads entire input into memory for counting. This is efficient for typical text files in the VFS but consider the memory footprint for very large datasets.
+</Note>
+
+## Related Commands
+
+- [grep](/commands/grep) - Filter lines before counting
+- [sort](/commands/sort) - Organize before counting
+- [uniq](/commands/uniq) - Remove duplicates before counting
+- [cut](/commands/cut) - Extract fields for counting
+- [head](/commands/head-tail) - Limit lines
+- [tail](/commands/head-tail) - View last lines

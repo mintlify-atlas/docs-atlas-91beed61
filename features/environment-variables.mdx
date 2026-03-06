@@ -1,0 +1,409 @@
+---
+title: 'Environment Variables'
+description: 'Default variables, custom variables, and the export command'
+---
+
+Nash manages environment variables just like a Unix shell. Variables are inherited by commands and can be modified at runtime.
+
+## Default Environment Variables
+
+Nash initializes these standard Unix variables at startup:
+
+| Variable | Default Value | Description |
+|----------|---------------|-------------|
+| `USER` | From `-U` flag (default: `user`) | Current username |
+| `LOGNAME` | Same as `USER` | Login name |
+| `HOME` | `/home/<user>` | Home directory path |
+| `SHELL` | `nash` | Shell name |
+| `TERM` | `xterm-256color` | Terminal type |
+| `LANG` | `en_US.UTF-8` | Locale setting |
+| `LC_ALL` | `en_US.UTF-8` | Locale override |
+| `PATH` | `/usr/local/bin:/usr/bin:/bin` | Command search path |
+| `PWD` | Current directory | Working directory (synced by `cd`) |
+| `OLDPWD` | `/` | Previous directory (used by `cd -`) |
+| `HOSTNAME` | `nash` | System hostname |
+| `SHLVL` | `1` | Shell nesting level |
+
+<Info>
+All default variables can be overridden using the `-E` flag at startup.
+</Info>
+
+### How Defaults Are Set
+
+```rust Environment initialization
+// src/runtime/executor.rs
+let mut env = config.env;
+env.entry("USER".into())
+    .or_insert_with(|| username.to_string());
+env.entry("LOGNAME".into())
+    .or_insert_with(|| username.to_string());
+env.entry("HOME".into())
+    .or_insert_with(|| home_dir.clone());
+env.entry("SHELL".into())
+    .or_insert_with(|| "nash".into());
+env.entry("TERM".into())
+    .or_insert_with(|| "xterm-256color".into());
+env.entry("LANG".into())
+    .or_insert_with(|| "en_US.UTF-8".into());
+env.entry("PATH".into())
+    .or_insert_with(|| "/usr/local/bin:/usr/bin:/bin".into());
+env.entry("PWD".into())
+    .or_insert_with(|| cwd.clone());
+env.entry("OLDPWD".into())
+    .or_insert_with(|| "/".into());
+env.entry("HOSTNAME".into())
+    .or_insert_with(|| "nash".into());
+env.entry("SHLVL".into())
+    .or_insert_with(|| "1".into());
+```
+
+## Setting Variables with -E Flag
+
+Define custom variables at startup:
+
+```bash Single variable
+nash -E DEBUG=true
+```
+
+```bash Multiple variables
+nash -E API_URL=http://localhost:8080 -E DEBUG=true -E LOG_LEVEL=info
+```
+
+**Inside Nash:**
+
+```bash
+user@nash:/home/user$ echo $DEBUG
+true
+
+user@nash:/home/user$ echo $API_URL
+http://localhost:8080
+```
+
+### Override Defaults
+
+You can replace built-in variables:
+
+```bash Custom PATH
+nash -E PATH=/custom/bin:/usr/bin
+```
+
+```bash
+user@nash:/home/user$ echo $PATH
+/custom/bin:/usr/bin
+```
+
+<Note>
+Variables set with `-E` are initialized **before** any rc files are sourced.
+</Note>
+
+## Exporting Variables at Runtime
+
+Use the `export` command to set variables inside a Nash session:
+
+```bash
+user@nash:/home/user$ export GREETING=hello
+
+user@nash:/home/user$ echo $GREETING
+hello
+
+user@nash:/home/user$ export API_KEY=secret123 LOG_LEVEL=debug
+
+user@nash:/home/user$ env | grep API_KEY
+API_KEY=secret123
+```
+
+### Implementation
+
+```rust Export builtin
+// src/builtins/env.rs
+impl Builtin for Export {
+    fn run(&self, args: &[String], ctx: &mut Context, _stdin: &str) -> Result<Output> {
+        for arg in args {
+            if let Some((k, v)) = arg.split_once('=') {
+                ctx.env.insert(k.to_string(), v.to_string());
+            }
+        }
+        Ok(Output::success(""))
+    }
+}
+```
+
+<Accordion title="Viewing all variables">
+Use the `env` command:
+
+```bash
+user@nash:/home/user$ env
+USER=user
+HOME=/home/user
+PATH=/usr/local/bin:/usr/bin:/bin
+SHELL=nash
+TERM=xterm-256color
+...
+```
+</Accordion>
+
+## Variable Expansion in Commands
+
+Nash expands `$VAR` and `${VAR}` syntax in command arguments:
+
+### Simple Expansion
+
+```bash
+user@nash:/home/user$ echo $HOME
+/home/user
+
+user@nash:/home/user$ echo $USER is logged in
+user is logged in
+```
+
+### Braced Expansion
+
+Use `${VAR}` to disambiguate:
+
+```bash
+user@nash:/home/user$ export PREFIX=test
+
+user@nash:/home/user$ echo ${PREFIX}_file.txt
+test_file.txt
+
+user@nash:/home/user$ echo $PREFIX_file.txt
+# Would look for variable named "PREFIX_file" (probably empty)
+```
+
+### Expansion in Redirects
+
+```bash
+user@nash:/home/user$ export OUTFILE=/tmp/result.txt
+
+user@nash:/home/user$ echo hello > $OUTFILE
+
+user@nash:/home/user$ cat $OUTFILE
+hello
+```
+
+### Expansion in Pipes
+
+```bash
+user@nash:/home/user$ export PATTERN=error
+
+user@nash:/home/user$ cat /var/log/app.log | grep $PATTERN
+```
+
+## How Expansion Works
+
+The lexer parses `$VAR` into a `WordPart::Variable`, and the executor substitutes the value:
+
+```rust Variable expansion
+// src/runtime/executor.rs
+fn expand_word(&mut self, word: &Word) -> Result<String> {
+    let mut result = String::new();
+    for part in &word.0 {
+        match part {
+            WordPart::Literal(s) => result.push_str(s),
+            WordPart::Variable(name) => {
+                let val = self.ctx.env.get(name).cloned().unwrap_or_default();
+                result.push_str(&val);
+            }
+            WordPart::CommandSubst(expr) => {
+                let output = self.eval(expr, "")?;
+                result.push_str(output.stdout.trim_end_matches('\n'));
+            }
+        }
+    }
+    Ok(result)
+}
+```
+
+**Behavior:**
+
+- If `$VAR` is unset, it expands to an empty string
+- No error is raised for missing variables (Bash-like behavior)
+
+<Warning>
+Nash does not support `-u` (nounset) mode that would error on undefined variables. Missing variables silently expand to `""`.
+</Warning>
+
+## Quoting and Expansion
+
+### Single Quotes (No Expansion)
+
+```bash
+user@nash:/home/user$ echo '$HOME'
+$HOME
+```
+
+Single quotes preserve the literal `$` character.
+
+### Double Quotes (Expansion Enabled)
+
+```bash
+user@nash:/home/user$ echo "$HOME"
+/home/user
+
+user@nash:/home/user$ echo "User: $USER, Shell: $SHELL"
+User: user, Shell: nash
+```
+
+### Unquoted (Expansion + Word Splitting)
+
+```bash
+user@nash:/home/user$ export FILES="a.txt b.txt"
+
+user@nash:/home/user$ echo $FILES
+a.txt b.txt
+```
+
+Note: Nash does not perform word splitting like Bash. The entire expanded value is treated as a single argument.
+
+## Unsetting Variables
+
+Remove a variable with `unset`:
+
+```bash
+user@nash:/home/user$ export TEMP=value
+
+user@nash:/home/user$ echo $TEMP
+value
+
+user@nash:/home/user$ unset TEMP
+
+user@nash:/home/user$ echo $TEMP
+# (empty output)
+```
+
+### Implementation
+
+```rust Unset builtin
+// src/builtins/env.rs
+impl Builtin for Unset {
+    fn run(&self, args: &[String], ctx: &mut Context, _stdin: &str) -> Result<Output> {
+        for arg in args {
+            ctx.env.swap_remove(arg);
+        }
+        Ok(Output::success(""))
+    }
+}
+```
+
+## Built-in Variable Tracking
+
+### PWD Synchronization
+
+The `cd` command updates `$PWD` and `$OLDPWD`:
+
+```bash
+user@nash:/home/user$ pwd
+/home/user
+
+user@nash:/home/user$ cd /tmp
+
+user@nash:/tmp$ echo $PWD
+/tmp
+
+user@nash:/tmp$ echo $OLDPWD
+/home/user
+
+user@nash:/tmp$ cd -
+user@nash:/home/user$ pwd
+/home/user
+```
+
+The executor syncs `$PWD` after every command:
+
+```rust PWD sync
+// src/runtime/executor.rs
+pub fn sync_pwd(&mut self) {
+    let cwd = self.ctx.cwd.clone();
+    self.ctx.env.insert("PWD".into(), cwd);
+}
+```
+
+### USER and HOME
+
+These are set based on the `-U` flag:
+
+```bash Custom user
+nash -U alice
+```
+
+```bash
+alice@nash:/home/alice$ echo $USER
+alice
+
+alice@nash:/home/alice$ echo $HOME
+/home/alice
+```
+
+## Environment in Subshells
+
+Variables exported in a subshell `( )` do not persist:
+
+```bash
+user@nash:/home/user$ export OUTER=value
+
+user@nash:/home/user$ (export INNER=subshell; echo $INNER)
+subshell
+
+user@nash:/home/user$ echo $INNER
+# (empty — INNER was only set inside subshell)
+
+user@nash:/home/user$ echo $OUTER
+value
+```
+
+See [Sandbox Security](/features/sandbox-security) for subshell isolation details.
+
+## Real-World Examples
+
+### Configuration Management
+
+```bash
+nash -E CONFIG_PATH=/etc/myapp/config.toml
+```
+
+```bash
+user@nash:/home/user$ cat $CONFIG_PATH | grep api_url
+api_url = "https://api.example.com"
+```
+
+### Build Scripts
+
+```bash
+export BUILD_DIR=/tmp/build
+export VERSION=1.2.3
+
+mkdir -p $BUILD_DIR
+echo "Building version $VERSION" > $BUILD_DIR/build.log
+```
+
+### Conditional Logic
+
+```bash
+export DEBUG=true
+
+test "$DEBUG" = "true" && echo "Debug mode enabled"
+```
+
+### Reusable Paths
+
+```bash
+export DATA_DIR=/data
+export LOGS_DIR=/var/log
+
+cat $DATA_DIR/input.txt | grep error > $LOGS_DIR/errors.txt
+```
+
+## Summary
+
+| Task | Command | Example |
+|------|---------|--------|
+| **Set at startup** | `-E KEY=VALUE` | `nash -E DEBUG=1` |
+| **Set at runtime** | `export KEY=VALUE` | `export API_URL=http://localhost` |
+| **View variable** | `echo $KEY` | `echo $HOME` |
+| **View all** | `env` | `env \| grep USER` |
+| **Unset variable** | `unset KEY` | `unset TEMP` |
+| **Braced expansion** | `${KEY}` | `echo ${USER}_file` |
+
+<Info>
+Nash's environment variable behavior closely mirrors Bash, making it intuitive for shell script authors.
+</Info>

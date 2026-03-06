@@ -1,0 +1,190 @@
+---
+title: Introduction
+description: Nash is a sandboxed, bash-like command interpreter that provides full shell functionality without ever touching your host system.
+---
+
+## What is Nash?
+
+Nash (**Not A Shell**) is a sandboxed, bash-like command interpreter written in Rust. It looks and behaves like a minimal Bash shell, but it **never executes real system commands or touches the host filesystem directly**. Everything runs inside a fully controlled in-memory Virtual Filesystem (VFS) with an optional host-directory overlay via explicit mount bindings.
+
+```bash
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  welcome.txt
+
+user@nash:/home/user$ echo "hello world" | grep hello
+hello world
+
+user@nash:/home/user$ mkdir projects && cd projects
+user@nash:/home/user/projects$ pwd
+/home/user/projects
+```
+
+## Why Nash?
+
+Nash was created to provide a **safe environment** for executing shell scripts and commands without the security risks of a real shell. It's perfect for:
+
+<CardGroup cols={2}>
+  <Card title="Safe Script Execution" icon="shield-check">
+    Execute untrusted scripts in a completely isolated environment with zero risk to your host system.
+  </Card>
+  
+  <Card title="Testing & Development" icon="flask">
+    Test shell scripts and commands in a controlled sandbox before deploying to production.
+  </Card>
+  
+  <Card title="Education" icon="graduation-cap">
+    Learn shell scripting in a safe environment where mistakes can't damage your system.
+  </Card>
+  
+  <Card title="Process Isolation" icon="cube">
+    Run scripts with controlled access to specific directories through explicit mounts.
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Bash-Compatible Syntax
+
+Nash supports all the shell syntax you're familiar with:
+
+- **Pipes**: `cat file.txt | grep foo | sort | uniq`
+- **Redirections**: `echo hello > out.txt`, `cat < in.txt`, `echo world >> out.txt`
+- **Command chaining**: `mkdir dist && cd dist`, `test -f config.json || echo "missing"`
+- **Subshells**: `(cd /tmp && ls)`
+- **Variable expansion**: `echo $HOME`, `echo ${USER}@nash`
+- **Command substitution**: `echo "Files: $(ls | wc -l)"`
+- **Quoting**: `'no $expansion'` vs `"with $expansion"`
+
+### 28 Built-in Commands
+
+Nash includes a comprehensive set of Unix utilities built from scratch:
+
+- **File operations**: `cat`, `cp`, `mv`, `rm`, `touch`, `file`
+- **Directory navigation**: `cd`, `pwd`, `ls`, `tree`, `find`
+- **Text processing**: `grep`, `sed`, `cut`, `sort`, `uniq`, `wc`, `head`, `tail`
+- **Data manipulation**: `jq` for JSON processing
+- **Shell utilities**: `echo`, `env`, `export`, `test`, `which`, `history`
+- **System commands**: `mkdir`, `stat`, `clear`, `help`
+
+<Info>
+  All commands operate exclusively through the VFS API. No system binaries are ever invoked.
+</Info>
+
+### In-Memory Virtual Filesystem
+
+Nash boots with a complete Unix directory tree entirely in memory:
+
+```
+/
+├── bin/         sbin/
+├── usr/
+│   ├── bin/     sbin/     local/bin/
+├── etc/
+│   ├── hostname            shells
+├── var/
+│   ├── log/     tmp/
+├── tmp/
+├── lib/         lib64/
+├── opt/
+├── home/
+│   └── <user>/
+│       ├── Desktop/        Documents/        Downloads/
+│       ├── .nashrc
+│       └── welcome.txt
+└── root/        proc/       dev/
+```
+
+Host directories are only accessible through **explicit mounts**:
+
+```bash
+nash --bind ./project:/project                   # read-write
+nash --bind-ro ./config:/etc/config             # read-only
+```
+
+## Security Model
+
+<Warning>
+  Nash provides structural security guarantees, not just policy-based restrictions.
+</Warning>
+
+Sandboxing in Nash is **structurally enforced** at the code level:
+
+1. **No system calls**: `std::process::Command` is never imported anywhere in the codebase. Nash cannot spawn system processes.
+
+2. **VFS isolation**: All file I/O goes through the Virtual Filesystem API. Host paths are unreachable without an explicit `--bind` mount.
+
+3. **Read-only enforcement**: Read-only mounts reject writes at the VFS layer, not the command layer. This protection cannot be bypassed.
+
+4. **Subshell isolation**: Subshells run on a cloned context, so environment mutations don't escape `()` blocks.
+
+```bash
+# Verify no system calls exist in the codebase
+grep -r "std::process\|Command::new\|bash -c" src/
+# (no output)
+```
+
+### What Nash Cannot Do
+
+- Execute real system binaries
+- Access host filesystem outside of mounted directories
+- Make network connections
+- Spawn processes
+- Access system resources directly
+
+### What Nash Can Do
+
+- Execute all built-in commands in isolation
+- Read and write files in the VFS
+- Access mounted host directories (with permission)
+- Run scripts safely
+- Process data with pipes and redirections
+
+## Use Cases
+
+### Sandboxed Script Execution
+
+Run untrusted scripts in complete isolation:
+
+```bash
+# Download and run a script safely
+curl https://example.com/script.sh | nash
+```
+
+### Controlled Host Access
+
+Give scripts limited access to specific directories:
+
+```bash
+# Mount project directory read-write, config read-only
+nash -B ./project:/work --bind-ro ./config:/config -C /work
+```
+
+### Development & Testing
+
+Test shell scripts without affecting your system:
+
+```bash
+# Test destructive operations safely
+nash test-cleanup.sh
+```
+
+### Educational Environment
+
+Learn shell commands without fear:
+
+```bash
+# Students can experiment freely
+nash -U student
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Nash on your system using cargo
+  </Card>
+  
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started with a hands-on tutorial
+  </Card>
+</CardGroup>

@@ -1,0 +1,296 @@
+---
+title: unset
+description: Remove environment variables
+---
+
+## Overview
+
+The `unset` command removes one or more environment variables from the current Nash shell session. Once unset, the variable is no longer available and will not appear in `env` output.
+
+## Syntax
+
+```bash
+unset VAR [VAR...]
+```
+
+## Description
+
+The `unset` command removes environment variables by name. Multiple variables can be removed in a single command. After unsetting, attempting to reference the variable will result in an empty expansion.
+
+## Options
+
+<Note>
+The `unset` command does not accept any flags or options. It only accepts variable names as arguments.
+</Note>
+
+## Examples
+
+### Unset a Single Variable
+
+```bash
+export API_KEY=secret123
+echo $API_KEY
+# Output: secret123
+
+unset API_KEY
+echo $API_KEY
+# Output: (empty)
+```
+
+### Unset Multiple Variables
+
+```bash
+export DB_HOST=localhost DB_PORT=5432 DB_NAME=myapp
+env | grep DB
+# Output:
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_NAME=myapp
+
+unset DB_HOST DB_PORT DB_NAME
+env | grep DB
+# Output: (empty)
+```
+
+### Verify Variable is Unset
+
+```bash
+export TEMP_VAR=temporary
+env | grep TEMP_VAR
+# Output: TEMP_VAR=temporary
+
+unset TEMP_VAR
+env | grep TEMP_VAR
+# Output: (empty - no match)
+```
+
+### Unset Non-Existent Variable
+
+```bash
+unset DOES_NOT_EXIST
+# No error - command succeeds silently
+```
+
+## Practical Use Cases
+
+### Clean Up Temporary Variables
+
+```bash
+# Set temporary variables for a task
+export BUILD_ID=12345
+export BUILD_TEMP=/tmp/build-12345
+
+# Use variables...
+echo "Building $BUILD_ID in $BUILD_TEMP"
+
+# Clean up when done
+unset BUILD_ID BUILD_TEMP
+```
+
+### Reset Configuration
+
+```bash
+# Remove all API-related variables
+unset API_KEY API_URL API_TIMEOUT
+
+# Verify cleanup
+env | grep API
+# Output: (empty)
+```
+
+### Security: Clear Sensitive Data
+
+```bash
+# Use password temporarily
+export DB_PASSWORD=secret123
+# ... perform database operations ...
+
+# Immediately unset sensitive data
+unset DB_PASSWORD
+```
+
+### Revert to Defaults
+
+```bash
+# Override default
+export PORT=3000
+
+# Later, remove override to use system default
+unset PORT
+```
+
+### Clean Environment Before Tests
+
+```bash
+# Clear all test-related variables
+unset TEST_ENV TEST_MODE TEST_DB TEST_API
+
+# Set fresh test environment
+export TEST_ENV=local
+export TEST_MODE=debug
+```
+
+### Conditional Unset
+
+```bash
+# Unset if variable matches condition
+test "$DEBUG" = "false" && unset DEBUG
+```
+
+## Variable Name vs. Value
+
+<Warning>
+Provide the variable **name** without the `$` prefix:
+
+```bash
+# Correct
+unset MY_VAR
+
+# Incorrect - this tries to unset the value, not the variable
+unset $MY_VAR
+```
+</Warning>
+
+## Comparison with Export
+
+<Tabs>
+  <Tab title="export">
+    Sets or modifies variables:
+    ```bash
+    export KEY=value
+    echo $KEY
+    # Output: value
+    ```
+  </Tab>
+  <Tab title="unset">
+    Removes variables completely:
+    ```bash
+    unset KEY
+    echo $KEY
+    # Output: (empty)
+    ```
+  </Tab>
+</Tabs>
+
+## System Variables
+
+<Warning>
+Be careful when unsetting system variables:
+
+```bash
+# Unsetting PATH makes commands harder to locate
+unset PATH
+
+# Unsetting HOME can break scripts that depend on it
+unset HOME
+
+# Unsetting PWD may cause confusion
+unset PWD
+```
+
+If you need to modify system variables, use `export` to override rather than `unset`:
+
+```bash
+export PATH=/custom/path:$PATH
+```
+</Warning>
+
+## Subshell Behavior
+
+Changes in subshells don't affect the parent:
+
+```bash
+export OUTER=value
+
+# Unset in subshell
+(unset OUTER; echo $OUTER)
+# Output: (empty in subshell)
+
+echo $OUTER
+# Output: value (still set in parent)
+```
+
+## Checking if Variable is Set
+
+```bash
+# Set a variable
+export MY_VAR=value
+
+# Check if set using test
+test -n "$MY_VAR" && echo "Set" || echo "Not set"
+# Output: Set
+
+# Unset it
+unset MY_VAR
+
+# Check again
+test -n "$MY_VAR" && echo "Set" || echo "Not set"
+# Output: Not set
+```
+
+## Multiple Unsets
+
+```bash
+# Set several variables
+export VAR1=a VAR2=b VAR3=c
+
+# Unset all at once
+unset VAR1 VAR2 VAR3
+
+# Or unset one by one
+unset VAR1
+unset VAR2
+unset VAR3
+```
+
+## Common Patterns
+
+### Cleanup Script Section
+
+```bash
+# At end of script
+echo "Cleaning up..."
+unset TEMP_DIR TEMP_FILE BUILD_ID
+echo "Cleanup complete"
+```
+
+### Environment Reset
+
+```bash
+# Clear all custom variables
+unset API_KEY API_URL
+unset DB_HOST DB_PORT DB_NAME
+unset DEBUG LOG_LEVEL
+
+# Verify clean state
+env | grep -E "API|DB|DEBUG|LOG"
+# Output: (empty)
+```
+
+### Conditional Cleanup
+
+```bash
+# Only unset if variable exists
+test -n "$TEMP_VAR" && unset TEMP_VAR
+```
+
+## Notes
+
+<Note>
+- Unsetting a non-existent variable does not produce an error
+- Once unset, the variable returns to an undefined state
+- Unsetting does not affect other shell sessions or subshells
+- Variable names are case-sensitive
+- You cannot unset read-only variables (if Nash supports them)
+</Note>
+
+## Exit Status
+
+The `unset` command always returns exit code `0` (success), even when unsetting non-existent variables.
+
+## Related Commands
+
+- [export](/commands/export) - Set or modify environment variables
+- [env](/commands/env) - Display all environment variables
+- [test](/commands/test) - Test if variables are set
+- [echo](/commands/echo) - Display variable values

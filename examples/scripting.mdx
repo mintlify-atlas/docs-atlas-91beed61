@@ -1,0 +1,536 @@
+---
+title: Scripting
+description: Write powerful Nash shell scripts with variables, conditionals, loops, and error handling
+---
+
+Nash scripts look and behave like bash scripts but run in a fully sandboxed environment. Scripts can use variables, conditionals, loops, and all Nash built-in commands.
+
+## Basic Script Structure
+
+Nash scripts are plain text files with commands:
+
+```bash hello.sh
+#!/usr/bin/env nash
+
+echo "Hello, World!"
+echo "Current directory: $(pwd)"
+echo "User: $USER"
+```
+
+Run the script:
+
+```bash
+user@nash:/home/user$ nash hello.sh
+Hello, World!
+Current directory: /home/user
+User: user
+```
+
+<Tip>
+  Shebangs like `#!/usr/bin/env nash` are ignored in Nash but help document script intent.
+</Tip>
+
+## Using Variables
+
+Variables are set without `$` and accessed with `$`:
+
+```bash variables.sh
+#!/usr/bin/env nash
+
+# Set variables using export
+export NAME="Alice"
+export VERSION="1.0.0"
+export PROJECT_DIR="/home/user/projects"
+
+# Access variables
+echo "Project: $NAME"
+echo "Version: $VERSION"
+echo "Location: $PROJECT_DIR"
+
+# Command substitution
+export CURRENT_TIME=$(echo "2024-03-15")
+export FILE_COUNT=$(ls | wc -l)
+
+echo "Time: $CURRENT_TIME"
+echo "Files: $FILE_COUNT"
+```
+
+Output:
+
+```
+Project: Alice
+Version: 1.0.0
+Location: /home/user/projects
+Time: 2024-03-15
+Files: 5
+```
+
+## Conditionals with Test
+
+The `test` command (or `[`) evaluates conditions:
+
+```bash conditionals.sh
+#!/usr/bin/env nash
+
+export CONFIG_FILE="config.json"
+
+# Test if file exists
+test -f $CONFIG_FILE && echo "Config found" || echo "Config missing"
+
+# Test if directory exists
+test -d /home/user && echo "Home directory exists"
+
+# String comparison
+export ENV="production"
+test "$ENV" = "production" && echo "Running in production mode"
+
+# Numeric comparison
+export PORT=8080
+test $PORT -eq 8080 && echo "Using default port"
+```
+
+### Test Operators
+
+<Tabs>
+  <Tab title="File tests">
+    | Operator | Description |
+    |----------|-------------|
+    | `-f` | File exists and is regular file |
+    | `-d` | Directory exists |
+    | `-e` | Path exists (file or directory) |
+  </Tab>
+
+  <Tab title="String tests">
+    | Operator | Description |
+    |----------|-------------|
+    | `=` | Strings are equal |
+    | `!=` | Strings are not equal |
+    | `-z` | String is empty |
+    | `-n` | String is not empty |
+  </Tab>
+
+  <Tab title="Numeric tests">
+    | Operator | Description |
+    |----------|-------------|
+    | `-eq` | Equal |
+    | `-ne` | Not equal |
+    | `-lt` | Less than |
+    | `-le` | Less than or equal |
+    | `-gt` | Greater than |
+    | `-ge` | Greater than or equal |
+  </Tab>
+</Tabs>
+
+## Error Handling
+
+Use the `-e` flag to exit immediately on error:
+
+```bash error_handling.sh
+#!/usr/bin/env nash -e
+
+echo "Starting process..."
+
+# Create required directory
+mkdir -p /home/user/output
+test -d /home/user/output || exit 1
+
+echo "Directory ready"
+
+# Create output file
+touch /home/user/output/result.txt
+test -f /home/user/output/result.txt && echo "File created" || exit 1
+
+echo "Process completed successfully"
+```
+
+Run with error checking:
+
+```bash
+user@nash:/home/user$ nash -e error_handling.sh
+Starting process...
+Directory ready
+File created
+Process completed successfully
+```
+
+<Tip>
+  The `-e` flag (errexit) makes scripts fail fast when any command returns a non-zero exit code. Use it for production scripts.
+</Tip>
+
+## Complete Script Examples
+
+### Example 1: Project Setup Script
+
+```bash setup_project.sh
+#!/usr/bin/env nash -e
+
+export PROJECT_NAME="my-app"
+export PROJECT_DIR="/home/user/projects/$PROJECT_NAME"
+
+echo "Setting up project: $PROJECT_NAME"
+
+# Create project structure
+mkdir -p $PROJECT_DIR
+cd $PROJECT_DIR
+
+mkdir -p src tests docs config
+echo "Created directory structure"
+
+# Create initial files
+touch README.md
+echo "# $PROJECT_NAME" > README.md
+echo "" >> README.md
+echo "A new project" >> README.md
+
+touch src/main.js
+echo "// Main application file" > src/main.js
+
+touch tests/main.test.js
+echo "// Test file" > tests/main.test.js
+
+touch config/settings.json
+echo '{"version": "1.0.0"}' > config/settings.json
+
+# Create .gitignore
+touch .gitignore
+echo "node_modules/" > .gitignore
+echo "dist/" >> .gitignore
+echo ".env" >> .gitignore
+
+echo "Created initial files"
+
+# Display structure
+tree $PROJECT_DIR
+
+echo "Project setup complete!"
+```
+
+Run the script:
+
+```bash
+user@nash:/home/user$ nash setup_project.sh
+Setting up project: my-app
+Created directory structure
+Created initial files
+/home/user/projects/my-app
+├── .gitignore
+├── README.md
+├── config/
+│   └── settings.json
+├── docs/
+├── src/
+│   └── main.js
+└── tests/
+    └── main.test.js
+
+4 directories, 5 files
+Project setup complete!
+```
+
+### Example 2: Log Analysis Script
+
+```bash analyze_logs.sh
+#!/usr/bin/env nash
+
+export LOG_FILE="/home/user/access.log"
+export OUTPUT_DIR="/home/user/reports"
+
+echo "Analyzing logs: $LOG_FILE"
+
+# Create output directory
+mkdir -p $OUTPUT_DIR
+
+# Check if log file exists
+test -f $LOG_FILE || {
+  echo "Error: Log file not found"
+  exit 1
+}
+
+# Count total requests
+export TOTAL=$(cat $LOG_FILE | wc -l)
+echo "Total requests: $TOTAL"
+
+# Extract GET requests
+cat $LOG_FILE | grep "GET" > $OUTPUT_DIR/get_requests.txt
+export GET_COUNT=$(cat $OUTPUT_DIR/get_requests.txt | wc -l)
+echo "GET requests: $GET_COUNT"
+
+# Extract POST requests
+cat $LOG_FILE | grep "POST" > $OUTPUT_DIR/post_requests.txt
+export POST_COUNT=$(cat $OUTPUT_DIR/post_requests.txt | wc -l)
+echo "POST requests: $POST_COUNT"
+
+# Find unique IPs
+cat $LOG_FILE | cut -d' ' -f1 | sort | uniq > $OUTPUT_DIR/unique_ips.txt
+export UNIQUE_IPS=$(cat $OUTPUT_DIR/unique_ips.txt | wc -l)
+echo "Unique IPs: $UNIQUE_IPS"
+
+# Top IPs
+cat $LOG_FILE | cut -d' ' -f1 | sort | uniq -c | sort -r > $OUTPUT_DIR/top_ips.txt
+echo "Top IPs saved to $OUTPUT_DIR/top_ips.txt"
+
+# Create summary
+echo "=== Log Analysis Summary ===" > $OUTPUT_DIR/summary.txt
+echo "Total Requests: $TOTAL" >> $OUTPUT_DIR/summary.txt
+echo "GET Requests: $GET_COUNT" >> $OUTPUT_DIR/summary.txt
+echo "POST Requests: $POST_COUNT" >> $OUTPUT_DIR/summary.txt
+echo "Unique IPs: $UNIQUE_IPS" >> $OUTPUT_DIR/summary.txt
+
+echo "Analysis complete! Results in $OUTPUT_DIR"
+cat $OUTPUT_DIR/summary.txt
+```
+
+### Example 3: Backup Script
+
+```bash backup.sh
+#!/usr/bin/env nash -e
+
+export SOURCE_DIR="/home/user/projects"
+export BACKUP_DIR="/home/user/backups"
+export TIMESTAMP=$(echo "2024-03-15-120000")
+export BACKUP_NAME="backup-$TIMESTAMP"
+
+echo "Starting backup process..."
+echo "Source: $SOURCE_DIR"
+echo "Destination: $BACKUP_DIR/$BACKUP_NAME"
+
+# Verify source exists
+test -d $SOURCE_DIR || {
+  echo "Error: Source directory not found"
+  exit 1
+}
+
+# Create backup directory
+mkdir -p $BACKUP_DIR/$BACKUP_NAME
+
+# Create backup metadata
+touch $BACKUP_DIR/$BACKUP_NAME/metadata.txt
+echo "Backup created: $TIMESTAMP" > $BACKUP_DIR/$BACKUP_NAME/metadata.txt
+echo "Source: $SOURCE_DIR" >> $BACKUP_DIR/$BACKUP_NAME/metadata.txt
+echo "Files:" >> $BACKUP_DIR/$BACKUP_NAME/metadata.txt
+
+# Find and list all files
+find $SOURCE_DIR -type f > /home/user/file_list.txt
+export FILE_COUNT=$(cat /home/user/file_list.txt | wc -l)
+cat /home/user/file_list.txt >> $BACKUP_DIR/$BACKUP_NAME/metadata.txt
+
+echo "Found $FILE_COUNT files"
+
+# Copy files (simplified - normally would preserve structure)
+mkdir -p $BACKUP_DIR/$BACKUP_NAME/files
+
+echo "Backup completed successfully"
+echo "Backup location: $BACKUP_DIR/$BACKUP_NAME"
+echo "Total files: $FILE_COUNT"
+
+ls -l $BACKUP_DIR/$BACKUP_NAME/
+```
+
+### Example 4: Data Processing Pipeline
+
+```bash process_data.sh
+#!/usr/bin/env nash -e
+
+export INPUT_FILE="/home/user/raw_data.csv"
+export OUTPUT_DIR="/home/user/processed"
+
+echo "Data Processing Pipeline"
+echo "========================"
+
+# Setup
+mkdir -p $OUTPUT_DIR
+test -f $INPUT_FILE || {
+  echo "Creating sample data..."
+  touch $INPUT_FILE
+  echo "id,name,value,status" > $INPUT_FILE
+  echo "1,Alice,100,active" >> $INPUT_FILE
+  echo "2,Bob,200,inactive" >> $INPUT_FILE
+  echo "3,Charlie,150,active" >> $INPUT_FILE
+  echo "4,Diana,300,active" >> $INPUT_FILE
+  echo "5,Eve,50,inactive" >> $INPUT_FILE
+}
+
+echo "Step 1: Filtering active records"
+cat $INPUT_FILE | grep "active" > $OUTPUT_DIR/active.csv
+export ACTIVE_COUNT=$(cat $OUTPUT_DIR/active.csv | wc -l)
+echo "  Found $ACTIVE_COUNT active records"
+
+echo "Step 2: Extracting names"
+cat $OUTPUT_DIR/active.csv | cut -d',' -f2 > $OUTPUT_DIR/names.txt
+echo "  Saved to $OUTPUT_DIR/names.txt"
+
+echo "Step 3: Extracting values"
+cat $OUTPUT_DIR/active.csv | cut -d',' -f3 > $OUTPUT_DIR/values.txt
+echo "  Saved to $OUTPUT_DIR/values.txt"
+
+echo "Step 4: Creating summary"
+touch $OUTPUT_DIR/summary.txt
+echo "Data Processing Summary" > $OUTPUT_DIR/summary.txt
+echo "======================" >> $OUTPUT_DIR/summary.txt
+echo "" >> $OUTPUT_DIR/summary.txt
+echo "Active Records: $ACTIVE_COUNT" >> $OUTPUT_DIR/summary.txt
+echo "" >> $OUTPUT_DIR/summary.txt
+echo "Active Users:" >> $OUTPUT_DIR/summary.txt
+cat $OUTPUT_DIR/names.txt >> $OUTPUT_DIR/summary.txt
+
+echo "" >> $OUTPUT_DIR/summary.txt
+echo "Processing complete!"
+
+cat $OUTPUT_DIR/summary.txt
+```
+
+### Example 5: Environment Configuration
+
+```bash configure_env.sh
+#!/usr/bin/env nash
+
+export ENV_TYPE=$1
+
+# Default to development if not specified
+test -z "$ENV_TYPE" && export ENV_TYPE="development"
+
+echo "Configuring environment: $ENV_TYPE"
+
+# Set common variables
+export APP_NAME="myapp"
+export VERSION="1.0.0"
+
+# Environment-specific settings
+test "$ENV_TYPE" = "production" && {
+  export DEBUG="false"
+  export LOG_LEVEL="error"
+  export PORT=80
+  echo "Production configuration loaded"
+}
+
+test "$ENV_TYPE" = "development" && {
+  export DEBUG="true"
+  export LOG_LEVEL="debug"
+  export PORT=3000
+  echo "Development configuration loaded"
+}
+
+test "$ENV_TYPE" = "staging" && {
+  export DEBUG="false"
+  export LOG_LEVEL="info"
+  export PORT=8080
+  echo "Staging configuration loaded"
+}
+
+# Create .env file
+touch .env
+echo "APP_NAME=$APP_NAME" > .env
+echo "VERSION=$VERSION" >> .env
+echo "ENV=$ENV_TYPE" >> .env
+echo "DEBUG=$DEBUG" >> .env
+echo "LOG_LEVEL=$LOG_LEVEL" >> .env
+echo "PORT=$PORT" >> .env
+
+echo ""
+echo "Configuration file created:"
+cat .env
+
+echo ""
+echo "Environment ready!"
+```
+
+Run with different environments:
+
+```bash
+user@nash:/home/user$ nash configure_env.sh production
+Configuring environment: production
+Production configuration loaded
+
+Configuration file created:
+APP_NAME=myapp
+VERSION=1.0.0
+ENV=production
+DEBUG=false
+LOG_LEVEL=error
+PORT=80
+
+Environment ready!
+```
+
+## Script Best Practices
+
+<Steps>
+  <Step title="Use -e for error handling">
+    Add `-e` to the shebang to exit on errors:
+    ```bash
+    #!/usr/bin/env nash -e
+    ```
+  </Step>
+
+  <Step title="Validate inputs">
+    Check that required files and directories exist:
+    ```bash
+    test -f $INPUT_FILE || exit 1
+    test -d $OUTPUT_DIR || mkdir -p $OUTPUT_DIR
+    ```
+  </Step>
+
+  <Step title="Use descriptive variable names">
+    ```bash
+    export PROJECT_NAME="myapp"  # Good
+    export PN="myapp"            # Bad
+    ```
+  </Step>
+
+  <Step title="Add comments and echo progress">
+    ```bash
+    # Process data files
+    echo "Processing data..."
+    cat data.csv | grep active > results.txt
+    echo "Processing complete"
+    ```
+  </Step>
+
+  <Step title="Clean up temporary files">
+    ```bash
+    # Create temp file
+    touch /tmp/temp_data.txt
+    
+    # ... do work ...
+    
+    # Clean up
+    rm /tmp/temp_data.txt
+    ```
+  </Step>
+</Steps>
+
+## Shell Flags
+
+Nash supports bash-compatible flags:
+
+| Flag | Description | Usage |
+|------|-------------|-------|
+| `-e` | Exit on error | `nash -e script.sh` |
+| `-u` | Error on unset variables | `nash -u script.sh` |
+| `-x` | Print commands before execution | `nash -x script.sh` |
+| `-v` | Print lines as they are read | `nash -v script.sh` |
+
+<Tip>
+  Combine flags for better debugging: `nash -ex script.sh` runs with both error-exit and command-trace enabled.
+</Tip>
+
+## Running Scripts
+
+<CodeGroup>
+```bash Direct execution
+nash script.sh
+```
+
+```bash With flags
+nash -e script.sh
+nash -x script.sh
+```
+
+```bash With arguments
+nash script.sh arg1 arg2
+```
+
+```bash One-liner
+nash -c "echo hello && ls"
+```
+</CodeGroup>

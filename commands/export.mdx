@@ -1,0 +1,280 @@
+---
+title: export
+description: Set or modify environment variables
+---
+
+## Overview
+
+The `export` command sets or modifies environment variables in the current Nash shell session. Variables set with `export` are available to all commands executed in the current session and any subshells.
+
+## Syntax
+
+```bash
+export KEY=VALUE [KEY=VALUE...]
+```
+
+## Description
+
+The `export` command sets environment variables using `KEY=VALUE` syntax. Multiple variables can be set in a single command. The variables are immediately available to all subsequent commands and persist for the duration of the shell session.
+
+<Note>
+In Nash, variables must be set with `export` to be available. Unlike standard bash, Nash does not support setting variables without export.
+</Note>
+
+## Options
+
+<Note>
+The `export` command does not accept any flags or options. It only accepts `KEY=VALUE` assignments.
+</Note>
+
+## Examples
+
+### Set a Single Variable
+
+```bash
+export API_KEY=abc123
+echo $API_KEY
+# Output: abc123
+```
+
+### Set Multiple Variables
+
+```bash
+export HOST=localhost PORT=8080 DEBUG=true
+echo $HOST:$PORT
+# Output: localhost:8080
+```
+
+### Set Variable with Spaces
+
+```bash
+export MESSAGE="Hello, World!"
+echo $MESSAGE
+# Output: Hello, World!
+```
+
+### Update Existing Variable
+
+```bash
+export PATH=/custom/bin
+env | grep PATH
+# Output: PATH=/custom/bin
+```
+
+### Append to PATH
+
+```bash
+export PATH=$PATH:/new/path
+echo $PATH
+# Output: /usr/local/bin:/usr/bin:/bin:/new/path
+```
+
+### Set Empty Value
+
+```bash
+export EMPTY=
+env | grep EMPTY
+# Output: EMPTY=
+```
+
+### Use Command Substitution
+
+```bash
+export CURRENT_DIR=$(pwd)
+echo $CURRENT_DIR
+# Output: /home/user
+```
+
+### Set Multiple Related Variables
+
+```bash
+export DB_HOST=localhost DB_PORT=5432 DB_NAME=myapp
+echo "Database: $DB_HOST:$DB_PORT/$DB_NAME"
+# Output: Database: localhost:5432/myapp
+```
+
+## Practical Use Cases
+
+### Configure Application
+
+```bash
+# Set application configuration
+export APP_ENV=production
+export LOG_LEVEL=info
+export MAX_CONNECTIONS=100
+
+# Verify settings
+env | grep APP
+```
+
+### API Configuration
+
+```bash
+# Set API credentials
+export API_URL=https://api.example.com
+export API_KEY=secret_key_here
+export API_TIMEOUT=30
+```
+
+### Development Environment
+
+```bash
+# Set development variables
+export NODE_ENV=development
+export DEBUG=true
+export PORT=3000
+```
+
+### Custom Tool Configuration
+
+```bash
+# Configure editor
+export EDITOR=nano
+
+# Set default pager
+export PAGER=less
+```
+
+### Build Configuration
+
+```bash
+# Set build flags
+export BUILD_TYPE=release
+export TARGET_ARCH=x86_64
+export OPTIMIZATION=-O2
+```
+
+### Session Customization
+
+```bash
+# Customize prompt (if supported)
+export PS1="[\u@\h \W]\$ "
+
+# Set history size
+export HISTSIZE=1000
+```
+
+## Variable Naming Conventions
+
+<ParamField path="Uppercase" type="convention">
+  Environment variables are conventionally named in UPPERCASE
+  ```bash
+  export API_KEY=value
+  export DATABASE_URL=postgres://...
+  ```
+</ParamField>
+
+<ParamField path="Underscores" type="convention">
+  Use underscores to separate words, not hyphens or spaces
+  ```bash
+  export MY_VARIABLE=value  # Good
+  export MY-VARIABLE=value  # Bad (won't work)
+  ```
+</ParamField>
+
+<ParamField path="No spaces" type="requirement">
+  No spaces around the equals sign
+  ```bash
+  export KEY=VALUE   # Good
+  export KEY = VALUE # Bad (won't work)
+  ```
+</ParamField>
+
+## Variable Expansion
+
+Variables can be referenced in several ways:
+
+```bash
+export NAME=Alice
+
+# Basic expansion
+echo $NAME
+# Output: Alice
+
+# Braced expansion (recommended for clarity)
+echo ${NAME}
+# Output: Alice
+
+# Use in strings
+echo "Hello, $NAME!"
+# Output: Hello, Alice!
+
+# Use in command substitution
+export GREETING="Hello, $(echo $NAME)"
+echo $GREETING
+# Output: Hello, Alice
+```
+
+## Subshell Behavior
+
+Variables are inherited by subshells:
+
+```bash
+export OUTER=value
+
+# Subshell inherits variable
+(echo $OUTER)
+# Output: value
+
+# Changes in subshell don't affect parent
+(export OUTER=changed; echo $OUTER)
+# Output: changed
+
+echo $OUTER
+# Output: value (unchanged)
+```
+
+## Common Patterns
+
+### Load Configuration from File
+
+```bash
+# config.env contains:
+# export API_KEY=abc123
+# export API_URL=https://api.example.com
+
+cat config.env
+# Then manually export or source if supported
+```
+
+### Conditional Export
+
+```bash
+# Set default if not already set
+test -z "$PORT" && export PORT=8080
+```
+
+### Export with Fallback
+
+```bash
+# Use environment variable or default
+export LOG_LEVEL=${LOG_LEVEL:-info}
+# Note: Parameter expansion may not be fully supported in Nash
+```
+
+## Notes
+
+<Note>
+- Variables persist only for the current shell session
+- Variables are not saved between Nash sessions
+- Use `.nashrc` to set variables on every startup
+- Variable names are case-sensitive
+- Special characters in values should be quoted
+</Note>
+
+<Warning>
+- Spaces around `=` will cause syntax errors
+- Variable names cannot start with numbers
+- Avoid overwriting critical system variables like PATH without preserving the original value
+</Warning>
+
+## Exit Status
+
+The `export` command always returns exit code `0` (success).
+
+## Related Commands
+
+- [env](/commands/env) - Display all environment variables
+- [unset](/commands/unset) - Remove environment variables
+- [echo](/commands/echo) - Display variable values
+- [test](/commands/test) - Test variable values and conditions

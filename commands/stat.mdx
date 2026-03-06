@@ -1,0 +1,327 @@
+---
+title: stat
+description: Display detailed file status and metadata
+icon: chart-simple
+---
+
+## Syntax
+
+```bash
+stat FILE...
+```
+
+## Description
+
+The `stat` command displays detailed information about files and directories, including size, type, and permissions. It provides a Unix-like output format showing file metadata.
+
+<Note>
+Since Nash operates on an in-memory virtual filesystem, some traditional Unix metadata (like inodes, timestamps, and actual user/group IDs) are simulated or not tracked.
+</Note>
+
+## Parameters
+
+<ParamField path="FILE" type="string" required>
+  One or more files or directories to examine. Supports multiple arguments.
+</ParamField>
+
+## Behavior
+
+- **File size**: Calculated by reading file contents (actual bytes)
+- **Block size**: Simulated as 4096 bytes (standard Unix)
+- **Blocks**: Calculated as `(size + 511) / 512`
+- **Type**: "regular file" or "directory"
+- **Permissions**: Fixed as `0644` (rw-r--r--) for files
+- **Ownership**: Simulated as UID 1000/GID 1000 (user/user)
+
+## Output Format
+
+```
+  File: /path/to/file
+  Size: 1234            Blocks: 3          IO Block: 4096
+  Type: regular file
+Access: (0644/-rw-r--r--)  Uid: (1000/user)  Gid: (1000/user)
+  VFS: in-memory sandbox (no real inode)
+```
+
+## Examples
+
+### Stat a text file
+
+```bash
+stat welcome.txt
+```
+
+```
+  File: /home/user/welcome.txt
+  Size: 156             Blocks: 1          IO Block: 4096
+  Type: regular file
+Access: (0644/-rw-r--r--)  Uid: (1000/user)  Gid: (1000/user)
+  VFS: in-memory sandbox (no real inode)
+```
+
+### Stat a directory
+
+```bash
+stat Documents/
+```
+
+```
+  File: /home/user/Documents
+  Size: 0               Blocks: 0          IO Block: 4096
+  Type: directory
+Access: (0644/-rw-r--r--)  Uid: (1000/user)  Gid: (1000/user)
+  VFS: in-memory sandbox (no real inode)
+```
+
+### Stat multiple files
+
+```bash
+stat config.json data.csv
+```
+
+```
+  File: /home/user/config.json
+  Size: 2048            Blocks: 4          IO Block: 4096
+  Type: regular file
+Access: (0644/-rw-r--r--)  Uid: (1000/user)  Gid: (1000/user)
+  VFS: in-memory sandbox (no real inode)
+  File: /home/user/data.csv
+  Size: 15360           Blocks: 30         IO Block: 4096
+  Type: regular file
+Access: (0644/-rw-r--r--)  Uid: (1000/user)  Gid: (1000/user)
+  VFS: in-memory sandbox (no real inode)
+```
+
+### Check file size
+
+```bash
+touch empty.txt
+stat empty.txt
+```
+
+```
+  File: /home/user/empty.txt
+  Size: 0               Blocks: 0          IO Block: 4096
+  Type: regular file
+Access: (0644/-rw-r--r--)  Uid: (1000/user)  Gid: (1000/user)
+  VFS: in-memory sandbox (no real inode)
+```
+
+### Stat all files in directory
+
+```bash
+for f in *; do stat "$f"; done
+```
+
+### Compare file sizes
+
+```bash
+stat file1.txt file2.txt | grep Size
+```
+
+```
+  Size: 1024            Blocks: 2          IO Block: 4096
+  Size: 2048            Blocks: 4          IO Block: 4096
+```
+
+## Error Handling
+
+### Missing operand
+
+```bash
+stat
+```
+
+```
+stat: missing operand
+```
+
+Exit code: `1`
+
+### File doesn't exist
+
+```bash
+stat nonexistent.txt
+```
+
+```
+stat: cannot stat 'nonexistent.txt': No such file or directory
+```
+
+Continues processing remaining files if multiple arguments provided.
+
+### Mixed existing and non-existing files
+
+```bash
+stat existing.txt nonexistent.txt another.txt
+```
+
+Shows stat for `existing.txt`, error for `nonexistent.txt`, continues with `another.txt`.
+
+## Implementation Details
+
+- Source: `src/builtins/stat.rs`
+- Uses `vfs.exists()` to check file existence
+- Uses `vfs.is_dir()` to determine file type
+- Calculates size with `vfs.read()` for regular files
+- Directories always show size 0
+- Block calculation: `(size + 511) / 512` (rounds up to 512-byte blocks)
+- IO Block hardcoded to 4096 (standard page size)
+- Permissions, UID, and GID are simulated (not tracked in VFS)
+
+<Warning>
+Unlike Unix `stat`, Nash doesn't track:
+- Real inodes (no inode numbers)
+- Timestamps (atime, mtime, ctime)
+- Device numbers
+- Hard link counts
+- Actual permissions (always shows 0644)
+</Warning>
+
+## Differences from Unix stat
+
+| Feature | Unix stat | Nash stat |
+|---------|-----------|------------|
+| File size | ✅ Real bytes | ✅ Real bytes |
+| File type | ✅ Multiple types | ✅ File/directory |
+| Permissions | ✅ Actual mode | ❌ Always 0644 |
+| Ownership | ✅ Real UID/GID | ❌ Always 1000/user |
+| Timestamps | ✅ atime/mtime/ctime | ❌ Not tracked |
+| Inode number | ✅ Real inode | ❌ No inodes |
+| Hard links | ✅ Link count | ❌ Not tracked |
+| Device numbers | ✅ Major/minor | ❌ Not applicable |
+| `-f` (filesystem) | ✅ Supported | ❌ Not supported |
+| `-c` (format) | ✅ Custom format | ❌ Fixed format |
+| `-L` (follow symlinks) | ✅ Supported | ❌ No symlinks |
+
+## Use Cases
+
+### Check file size before processing
+```bash
+size=$(stat data.csv | grep Size | awk '{print $2}')
+if test $size -gt 1000000; then
+  echo "Large file detected: $size bytes"
+fi
+```
+
+### Verify file type
+```bash
+if stat myfile | grep -q "directory"; then
+  echo "This is a directory"
+else
+  echo "This is a file"
+fi
+```
+
+### List files with sizes
+```bash
+for f in *; do
+  echo "$f:"
+  stat "$f" | grep -E "Size|Type"
+done
+```
+
+### Compare before and after
+```bash
+stat large_file.txt
+cat filter.txt >> large_file.txt
+stat large_file.txt
+```
+
+### Find largest files
+```bash
+for f in *; do
+  if test -f "$f"; then
+    stat "$f" | grep Size
+  fi
+done | sort -k2 -n
+```
+
+## Common Patterns
+
+### Extract just the size
+```bash
+stat file.txt | grep Size | awk '{print $2}'
+```
+
+### Check if file is empty
+```bash
+if test $(stat file.txt | grep Size | awk '{print $2}') -eq 0; then
+  echo "File is empty"
+fi
+```
+
+### Directory size summary
+```bash
+total=0
+for f in *; do
+  if test -f "$f"; then
+    size=$(stat "$f" | grep Size | awk '{print $2}')
+    total=$((total + size))
+  fi
+done
+echo "Total size: $total bytes"
+```
+
+### Type-based processing
+```bash
+for item in *; do
+  type=$(stat "$item" | grep Type | awk '{print $2, $3}')
+  echo "$item: $type"
+done
+```
+
+## Output Parsing
+
+### Extract specific fields
+
+```bash
+# Get file size
+stat file.txt | grep Size | awk '{print $2}'
+```
+
+```
+1234
+```
+
+```bash
+# Get file type
+stat dir/ | grep Type | cut -d: -f2 | xargs
+```
+
+```
+directory
+```
+
+```bash
+# Get file path
+stat file.txt | grep File | cut -d: -f2 | xargs
+```
+
+```
+/home/user/file.txt
+```
+
+## Working with Mounted Directories
+
+```bash
+# nash --bind ./data:/data
+stat /data/large_file.bin
+```
+
+```
+  File: /data/large_file.bin
+  Size: 1048576         Blocks: 2048       IO Block: 4096
+  Type: regular file
+Access: (0644/-rw-r--r--)  Uid: (1000/user)  Gid: (1000/user)
+  VFS: in-memory sandbox (no real inode)
+```
+
+Note: Size reflects actual file content even for mounted files.
+
+## Related Commands
+
+- [`file`](/commands/file) - Determine file type by content
+- [`ls`](/commands/ls) - List files with size in long format
+- [`wc`](/commands/wc) - Count lines, words, and bytes
+- [`find`](/commands/find) - Find files by size or type

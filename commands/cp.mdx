@@ -1,0 +1,179 @@
+---
+title: cp
+description: Copy files and directories within the virtual filesystem
+icon: copy
+---
+
+## Syntax
+
+```bash
+cp SOURCE DEST
+cp SOURCE... DIRECTORY
+```
+
+## Description
+
+The `cp` command copies files from one location to another within Nash's virtual filesystem. It can copy a single file to a new name or copy multiple files into a directory.
+
+<Note>
+All copy operations happen within the VFS. To copy files between the host and VFS, you must use `--bind` mounts when launching Nash.
+</Note>
+
+## Parameters
+
+<ParamField path="SOURCE" type="string" required>
+  Path to the source file(s) to copy. Can be relative or absolute.
+</ParamField>
+
+<ParamField path="DEST" type="string" required>
+  Destination path. If this is a directory, source file(s) will be copied into it with their original names. If this is a file path, the source will be copied with the new name.
+</ParamField>
+
+## Behavior
+
+- **Single file to file**: `cp file.txt newfile.txt` creates a copy with a new name
+- **File(s) to directory**: `cp file1.txt file2.txt dir/` copies both files into `dir/`
+- **Directory detection**: If destination exists and is a directory, files are copied into it
+- **Name preservation**: When copying into a directory, the basename of the source is preserved
+- **Flag handling**: Arguments starting with `-` are filtered out
+
+## Examples
+
+### Copy a single file
+
+```bash
+cp config.json config.backup.json
+```
+
+### Copy to a different directory
+
+```bash
+cp report.txt Documents/
+```
+
+The file `report.txt` is copied to `Documents/report.txt`.
+
+### Copy multiple files to a directory
+
+```bash
+cp file1.txt file2.txt file3.txt backup/
+```
+
+All three files are copied into the `backup/` directory with their original names.
+
+### Copy with absolute paths
+
+```bash
+cp /home/user/data.csv /tmp/data.csv
+```
+
+### Overwrite existing file
+
+```bash
+cp new_config.json config.json
+```
+
+<Warning>
+Nash's `cp` will silently overwrite the destination file if it already exists. There is no `-i` (interactive) flag to prompt before overwriting.
+</Warning>
+
+## Error Handling
+
+### Missing destination
+
+```bash
+cp source.txt
+```
+
+```
+cp: missing destination operand
+```
+
+Exit code: `1`
+
+### Source file not found
+
+```bash
+cp nonexistent.txt dest.txt
+```
+
+Returns an error from the VFS layer describing that the source file doesn't exist.
+
+### Destination directory doesn't exist
+
+```bash
+cp file.txt nonexistent_dir/
+```
+
+If `nonexistent_dir/` doesn't exist, the file will be created with the name `nonexistent_dir/` (not recommended).
+
+## Implementation Details
+
+- Source: `src/builtins/cp.rs`
+- Uses `vfs.copy_file()` for the actual copy operation
+- Filters arguments to separate flags from file paths
+- Automatically detects if destination is a directory using `vfs.is_dir()`
+- Preserves original filename when copying into directories using `VfsPath::basename()`
+
+<Note>
+The current implementation only supports file copying. Directory copying (recursive `-r` flag) is not supported.
+</Note>
+
+## Differences from Unix cp
+
+| Feature | Unix cp | Nash cp |
+|---------|---------|----------|
+| Copy single file | ✅ Supported | ✅ Supported |
+| Copy multiple files | ✅ Supported | ✅ Supported |
+| Copy to directory | ✅ Supported | ✅ Supported |
+| `-r` (recursive) | ✅ Supported | ❌ Not supported |
+| `-i` (interactive) | ✅ Supported | ❌ Not supported |
+| `-v` (verbose) | ✅ Supported | ❌ Not supported |
+| `-p` (preserve) | ✅ Supported | ❌ Not applicable |
+| `-u` (update) | ✅ Supported | ❌ Not supported |
+| Symlinks | Dereferences | VFS has no symlinks |
+
+## Use Cases
+
+### Backup configuration files
+```bash
+cp config.json config.json.backup
+```
+
+### Organize files
+```bash
+mkdir -p archive/2024
+cp report.txt analysis.csv archive/2024/
+```
+
+### Duplicate for editing
+```bash
+cp template.sh my-script.sh
+```
+
+### Copy from mounted host directory
+```bash
+# Launch Nash with: nash --bind ./data:/data
+cp /data/input.csv /home/user/input.csv
+```
+
+## Common Patterns
+
+### Create a backup before editing
+```bash
+cp important.txt important.txt.bak
+echo "new content" >> important.txt
+```
+
+### Copy all files matching a pattern (using find)
+```bash
+find . -name "*.txt" | while read f; do cp "$f" backup/; done
+```
+
+## Related Commands
+
+- [`mv`](/commands/mv) - Move or rename files
+- [`rm`](/commands/rm) - Remove files
+- [`ls`](/commands/ls) - List directory contents
+- [`mkdir`](/commands/mkdir) - Create directories
+- [`stat`](/commands/stat) - Check file information

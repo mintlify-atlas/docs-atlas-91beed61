@@ -1,0 +1,465 @@
+---
+title: 'find'
+description: 'Search for files and directories recursively'
+---
+
+## Syntax
+
+```bash
+find [path] [-name pattern] [-type f|d] [-maxdepth N]
+```
+
+## Description
+
+The `find` command recursively searches for files and directories within Nash's virtual filesystem. It supports filtering by name patterns (with glob wildcards), file type, and maximum search depth. Each matching path is printed on a separate line.
+
+<Note>
+  Find operates within Nash's Virtual Filesystem (VFS). When searching mounted host directories, it searches through the VFS mount point.
+</Note>
+
+## Options
+
+<ParamField path="-name" type="string">
+  Filter results by filename pattern using glob syntax. Supports wildcards:
+  - `*` matches zero or more characters
+  - `?` matches exactly one character
+  
+  **Example**: `-name "*.txt"` finds all files ending in `.txt`
+</ParamField>
+
+<ParamField path="-type" type="char">
+  Filter results by entry type:
+  - `f` - regular files only
+  - `d` - directories only
+  
+  If omitted, both files and directories are returned.
+</ParamField>
+
+<ParamField path="-maxdepth" type="number">
+  Limit the depth of directory traversal. For example, `-maxdepth 1` searches only the specified directory without descending into subdirectories.
+  
+  **Note**: Depth counting starts at 0 for the initial directory.
+</ParamField>
+
+## Arguments
+
+<ParamField path="path" type="string" optional>
+  Starting directory for the search. Can be absolute or relative to the current working directory. If omitted, searches from the current directory (`.`).
+</ParamField>
+
+## Behavior
+
+1. Starts from the specified path (or current directory)
+2. Recursively descends into subdirectories (unless limited by `-maxdepth`)
+3. Tests each entry against all specified filters (`-name`, `-type`)
+4. Outputs absolute paths of matching entries, one per line
+5. Includes the starting directory if it matches all filters
+6. Searches depth-first through the directory tree
+
+## Examples
+
+### Find all files in current directory
+
+```bash
+user@nash:/home/user$ find
+/home/user
+/home/user/Desktop
+/home/user/Documents
+/home/user/Downloads
+/home/user/welcome.txt
+```
+
+### Find files by name pattern
+
+```bash
+user@nash:/home/user$ touch report.txt notes.txt data.csv
+user@nash:/home/user$ find -name "*.txt"
+/home/user/report.txt
+/home/user/notes.txt
+/home/user/welcome.txt
+```
+
+### Find only directories
+
+```bash
+user@nash:/home/user$ find -type d
+/home/user
+/home/user/Desktop
+/home/user/Documents
+/home/user/Downloads
+```
+
+### Find only files
+
+```bash
+user@nash:/home/user$ find -type f
+/home/user/welcome.txt
+/home/user/report.txt
+/home/user/notes.txt
+```
+
+### Search specific directory
+
+```bash
+user@nash:/home/user$ mkdir -p project/src project/tests
+user@nash:/home/user$ touch project/src/main.rs project/tests/test.rs
+user@nash:/home/user$ find project -name "*.rs"
+/home/user/project/src/main.rs
+/home/user/project/tests/test.rs
+```
+
+### Limit search depth
+
+```bash
+user@nash:/home/user$ mkdir -p a/b/c/d
+user@nash:/home/user$ touch a/file1.txt a/b/file2.txt a/b/c/file3.txt
+user@nash:/home/user$ find a -maxdepth 2 -name "*.txt"
+/home/user/a/file1.txt
+/home/user/a/b/file2.txt
+```
+
+### Combine multiple filters
+
+```bash
+user@nash:/home/user$ find project -type f -name "*.rs" -maxdepth 2
+/home/user/project/src/main.rs
+/home/user/project/tests/test.rs
+```
+
+### Find with wildcards
+
+```bash
+user@nash:/home/user$ touch test1.txt test2.txt test3.log
+user@nash:/home/user$ find -name "test*"
+/home/user/test1.txt
+/home/user/test2.txt
+/home/user/test3.log
+
+user@nash:/home/user$ find -name "test?.txt"
+/home/user/test1.txt
+/home/user/test2.txt
+```
+
+### Search from absolute path
+
+```bash
+user@nash:/$ find /etc -type f -maxdepth 1
+/etc/hostname
+/etc/shells
+```
+
+## Pattern Matching
+
+The `-name` option supports glob patterns:
+
+### Asterisk (*) - Match any characters
+
+```bash
+user@nash:/home/user$ find -name "*.txt"      # All .txt files
+user@nash:/home/user$ find -name "test*"      # Files starting with 'test'
+user@nash:/home/user$ find -name "*report*"   # Files containing 'report'
+```
+
+### Question mark (?) - Match single character
+
+```bash
+user@nash:/home/user$ find -name "file?.txt"  # file1.txt, file2.txt, fileA.txt
+user@nash:/home/user$ find -name "????.log"   # Any 4-character .log file
+```
+
+### Combined patterns
+
+```bash
+user@nash:/home/user$ find -name "test?.*.txt"  # test1.backup.txt, test2.old.txt
+```
+
+<Note>
+  Pattern matching is applied to the basename (filename) only, not the full path.
+</Note>
+
+## Use Cases
+
+### Locate configuration files
+
+```bash
+user@nash:/home/user$ find /etc -name "*.conf"
+/etc/app.conf
+/etc/config/settings.conf
+```
+
+### Find all source files
+
+```bash
+user@nash:/home/user$ find project -name "*.rs" -type f
+/home/user/project/src/main.rs
+/home/user/project/src/lib.rs
+/home/user/project/tests/integration.rs
+```
+
+### Count files by type
+
+```bash
+user@nash:/home/user$ find project -name "*.rs" | wc -l
+3
+```
+
+### List only immediate subdirectories
+
+```bash
+user@nash:/home/user$ find . -maxdepth 1 -type d
+.
+./Desktop
+./Documents
+./Downloads
+```
+
+### Find empty directories
+
+```bash
+user@nash:/home/user$ mkdir empty1 empty2
+user@nash:/home/user$ find . -type d -maxdepth 1
+.
+./Desktop
+./Documents
+./Downloads
+./empty1
+./empty2
+```
+
+### Search and process files
+
+```bash
+user@nash:/home/user$ find project -name "*.txt" | while read file; do
+  echo "Processing: $file"
+  cat "$file"
+done
+```
+
+## VFS Integration
+
+### Search mounted directories
+
+Find searches through mounted host directories:
+
+```bash
+# Start Nash with a mount
+$ nash --bind ./myproject:/project
+
+user@nash:/home/user$ find /project -name "*.rs"
+/project/src/main.rs
+/project/src/lib.rs
+/project/tests/test.rs
+```
+
+### Multiple mount points
+
+```bash
+$ nash --bind ./src:/app/src --bind ./docs:/app/docs
+
+user@nash:/home/user$ find /app -name "*.md"
+/app/docs/README.md
+/app/docs/guide.md
+```
+
+### Read-only mounts
+
+Find works identically on read-only mounts:
+
+```bash
+$ nash --bind-ro ./config:/config
+
+user@nash:/home/user$ find /config -name "*.json"
+/config/app.json
+/config/settings/dev.json
+```
+
+## Error Handling
+
+### Non-existent directory
+
+Find silently returns no results for non-existent paths:
+
+```bash
+user@nash:/home/user$ find nonexistent -name "*.txt"
+# No output, no error
+```
+
+### Permission errors in mounted directories
+
+If a mounted directory has host-level permission issues, those paths are silently skipped.
+
+## Combining with Other Commands
+
+### With rm to delete matched files
+
+```bash
+user@nash:/home/user$ find . -name "*.tmp" -type f
+./cache.tmp
+./temp.tmp
+user@nash:/home/user$ find . -name "*.tmp" -type f | xargs rm
+```
+
+<Warning>
+  Be careful when combining find with destructive commands. Always verify the find output first.
+</Warning>
+
+### With grep to search file contents
+
+```bash
+user@nash:/home/user$ find project -name "*.rs" | xargs grep "fn main"
+project/src/main.rs:fn main() {
+```
+
+### With wc to count results
+
+```bash
+user@nash:/home/user$ find . -type f | wc -l
+15
+user@nash:/home/user$ find . -type d | wc -l
+8
+```
+
+### With tree to compare
+
+```bash
+user@nash:/home/user$ tree -L 2 project
+project
+├── src/
+│   └── main.rs
+└── tests/
+    └── test.rs
+
+2 directories, 2 files
+
+user@nash:/home/user$ find project -type f
+/home/user/project/src/main.rs
+/home/user/project/tests/test.rs
+```
+
+### With sort and uniq
+
+```bash
+user@nash:/home/user$ find . -name "*.txt" | sort
+./notes.txt
+./report.txt
+./welcome.txt
+```
+
+## Output Format
+
+Find outputs absolute paths, one per line:
+
+```
+<absolute-path-1>
+<absolute-path-2>
+...
+```
+
+Directories do not have a trailing `/` in the output.
+
+## Exit Codes
+
+- **0** - Success: search completed (even if no matches found)
+
+## Related Commands
+
+- [`tree`](/commands/tree) - Display directory tree structure visually
+- [`ls`](/commands/ls) - List directory contents non-recursively
+- [`grep`](/commands/grep) - Search file contents (combine with find for full-text search)
+- [`pwd`](/commands/pwd) - Show current directory (default find starting point)
+- [`cd`](/commands/cd) - Change directory before searching
+
+## Implementation Details
+
+The `find` command is implemented in `/home/daytona/workspace/source/src/builtins/find.rs:9-125`. Key implementation notes:
+
+- Parses arguments to extract path, `-name`, `-type`, and `-maxdepth` options
+- Uses `find_recursive()` helper for depth-first traversal
+- Implements glob matching with `glob_match()` function supporting `*` and `?` wildcards
+- Pattern matching is applied to basename only via `VfsPath::basename()`
+- Depth counter starts at 0 for the initial path
+- `-maxdepth` applies to recursion depth, not output filtering
+- All paths in output are absolute, resolved via `VfsPath::join()`
+- Uses `vfs.is_dir()` and `vfs.list_dir()` for filesystem traversal
+
+## Performance Considerations
+
+<Warning>
+  Searching large directory trees without `-maxdepth` or `-name` filters can be slow and produce extensive output. Use filters to narrow results.
+</Warning>
+
+### Best practices for performance
+
+```bash
+# Use -maxdepth to limit traversal
+user@nash:/$ find / -maxdepth 2 -name "config.json"
+
+# Use -type to reduce matches
+user@nash:/$ find . -type f -name "*.log"
+
+# Search specific subdirectories instead of root
+user@nash:/$ find /home/user/project -name "*.rs"
+```
+
+## Comparison to Traditional Unix find
+
+Nash's `find` implements essential functionality:
+
+| Feature | Nash find | Unix find |
+|---------|-----------|------------|
+| `-name` pattern | ✓ Glob (* and ?) | ✓ Glob (* and ?) |
+| `-type f\|d` | ✓ Supported | ✓ Supported (+more) |
+| `-maxdepth N` | ✓ Supported | ✓ Supported |
+| `-iname` | ✗ Not supported | ✓ Case-insensitive |
+| `-size` | ✗ Not supported | ✓ Filter by size |
+| `-mtime` | ✗ Not supported | ✓ Filter by time |
+| `-exec` | ✗ Not supported | ✓ Execute commands |
+| `-regex` | ✗ Not supported | ✓ Regex patterns |
+| `-prune` | ✗ Not supported | ✓ Skip directories |
+| Logical ops | ✗ Not supported | ✓ -and, -or, -not |
+
+<Note>
+  For advanced filtering not supported by Nash's find, pipe results to other commands like `grep`, `sed`, or `awk`.
+</Note>
+
+## Examples: Real-World Workflows
+
+### Find and back up specific files
+
+```bash
+user@nash:/home/user$ mkdir backup
+user@nash:/home/user$ find project -name "*.rs" | while read f; do
+  cp "$f" backup/
+done
+```
+
+### Generate file inventory
+
+```bash
+user@nash:/home/user$ find project -type f > inventory.txt
+user@nash:/home/user$ cat inventory.txt
+/home/user/project/src/main.rs
+/home/user/project/src/lib.rs
+/home/user/project/tests/test.rs
+```
+
+### Verify directory structure
+
+```bash
+user@nash:/home/user$ find project -type d -maxdepth 2
+/home/user/project
+/home/user/project/src
+/home/user/project/tests
+/home/user/project/docs
+```
+
+### Locate files modified in scripts
+
+```bash
+#!/usr/bin/env nash
+LOG_FILES=$(find /var/log -name "*.log" -maxdepth 2)
+for log in $LOG_FILES; do
+  echo "Checking: $log"
+  grep ERROR "$log"
+done
+```

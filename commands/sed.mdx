@@ -1,0 +1,311 @@
+---
+title: sed
+description: Stream editor for text transformation
+---
+
+## Syntax
+
+```bash
+sed [OPTIONS] SCRIPT [FILE...]
+```
+
+## Description
+
+The `sed` (stream editor) command performs text transformations on input streams. It's particularly powerful for search-and-replace operations, line deletion, and pattern-based text manipulation.
+
+Nash implements a subset of sed's functionality, focusing on the most common operations while maintaining full sandbox isolation.
+
+## Options
+
+<ParamField path="SCRIPT" type="string" required>
+  The sed script expression to execute. See supported operations below.
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Silent mode. Suppress automatic printing of pattern space. Only print lines explicitly selected with the `p` command.
+</ParamField>
+
+<ParamField path="-e" type="flag">
+  Specify the script expression explicitly. Useful when the script starts with a dash.
+</ParamField>
+
+## Supported Operations
+
+### Substitution: `s/old/new/[flags]`
+
+Replace text matching a pattern.
+
+**Flags:**
+- `g` - Global: replace all occurrences in each line (not just the first)
+- `p` - Print: output lines where substitution occurred (use with `-n`)
+
+### Line deletion: `Nd`
+
+Delete line number N.
+
+### Print line: `Np`
+
+Print only line number N.
+
+### Delete all: `d`
+
+Delete all lines (results in empty output).
+
+## Examples
+
+### Basic substitution
+
+```bash
+echo "hello world" | sed 's/world/universe/'
+```
+
+<CodeGroup>
+```bash Output
+hello universe
+```
+</CodeGroup>
+
+### Global substitution
+
+```bash
+echo "foo bar foo baz" | sed 's/foo/XXX/g'
+```
+
+<CodeGroup>
+```bash Output
+XXX bar XXX baz
+```
+</CodeGroup>
+
+Without the `g` flag, only the first occurrence is replaced:
+
+```bash
+echo "foo bar foo baz" | sed 's/foo/XXX/'
+```
+
+<CodeGroup>
+```bash Output
+XXX bar foo baz
+```
+</CodeGroup>
+
+### Delete specific line
+
+```bash
+echo -e "line 1\nline 2\nline 3" | sed '2d'
+```
+
+<CodeGroup>
+```bash Output
+line 1
+line 3
+```
+</CodeGroup>
+
+### Print specific line
+
+```bash
+echo -e "line 1\nline 2\nline 3" | sed -n '2p'
+```
+
+<CodeGroup>
+```bash Output
+line 2
+```
+</CodeGroup>
+
+### Silent mode with substitution
+
+```bash
+echo -e "apple\nbanana\napricot" | sed -n 's/a/A/p'
+```
+
+<CodeGroup>
+```bash Output
+Apple
+bAnana
+Apricot
+```
+</CodeGroup>
+
+Only lines where substitution occurred are printed.
+
+### Using different delimiters
+
+```bash
+echo "/usr/local/bin" | sed 's|/usr/local|/opt|'
+```
+
+<CodeGroup>
+```bash Output
+/opt/bin
+```
+</CodeGroup>
+
+Useful when the pattern contains slashes.
+
+## Pipeline Examples
+
+### Transform log levels
+
+```bash
+cat app.log | sed 's/ERROR/[ERROR]/g' | sed 's/WARN/[WARN]/g'
+```
+
+Wraps log levels in brackets.
+
+### Clean up whitespace
+
+```bash
+echo "hello    world" | sed 's/  */ /g'
+```
+
+<CodeGroup>
+```bash Output
+hello world
+```
+</CodeGroup>
+
+### Replace file extensions
+
+```bash
+ls *.txt | sed 's/\.txt$/.md/'
+```
+
+Shows how filenames would look with `.md` extension.
+
+### Chain transformations
+
+```bash
+echo "Hello World" | sed 's/Hello/Hi/' | sed 's/World/Universe/'
+```
+
+<CodeGroup>
+```bash Output
+Hi Universe
+```
+</CodeGroup>
+
+## Practical Use Cases
+
+### Configuration file updates
+
+```bash
+cat config.ini | sed 's/debug=false/debug=true/' > config-dev.ini
+```
+
+### Remove sensitive data
+
+```bash
+cat users.csv | sed 's/@.*\.com/@REDACTED.com/g'
+```
+
+Redacts email domains.
+
+### Format conversion
+
+```bash
+cat data.csv | sed 's/,/\t/g'
+```
+
+Converts CSV to TSV (comma to tab).
+
+### Version string updates
+
+```bash
+cat package.json | sed 's/"version": "1.0.0"/"version": "1.1.0"/'
+```
+
+### Extract and transform
+
+```bash
+grep "ERROR" app.log | sed 's/.*ERROR: //' | sort | uniq
+```
+
+Extracts error messages, cleans them up, and shows unique errors.
+
+### Line numbering cleanup
+
+```bash
+cat -n file.txt | sed 's/^[ ]*[0-9]*[ ]//'
+```
+
+Removes line numbers added by `cat -n`.
+
+## Advanced Examples
+
+### Multiple substitutions in order
+
+```bash
+echo "abc" | sed 's/a/1/g' | sed 's/b/2/g' | sed 's/c/3/g'
+```
+
+<CodeGroup>
+```bash Output
+123
+```
+</CodeGroup>
+
+### Conditional replacement with print
+
+```bash
+echo -e "keep\nchange\nkeep" | sed -n 's/change/modified/p'
+```
+
+<CodeGroup>
+```bash Output
+modified
+```
+</CodeGroup>
+
+### Remove empty lines
+
+```bash
+cat file.txt | sed '/^$/d'
+```
+
+### Extract specific range
+
+```bash
+echo -e "a\nb\nc\nd\ne" | sed -n '2p' && echo -e "a\nb\nc\nd\ne" | sed -n '4p'
+```
+
+## Tips
+
+<Note>
+**Substitution is literal**: Nash's sed performs literal string replacement, not regular expressions. `s/a.b/xyz/` replaces the literal text "a.b", not "a" followed by any character and "b".
+</Note>
+
+### Delimiter flexibility
+
+You can use any character as the delimiter:
+
+```bash
+sed 's/old/new/'    # Forward slash
+sed 's|old|new|'    # Pipe
+sed 's:old:new:'    # Colon
+sed 's#old#new#'    # Hash
+```
+
+### Global flag matters
+
+```bash
+echo "aaa" | sed 's/a/X/'    # Xaa (first only)
+echo "aaa" | sed 's/a/X/g'   # XXX (all)
+```
+
+### Silent mode usage
+
+Use `-n` with `p` flag to see only modified lines:
+
+```bash
+cat large.txt | sed -n 's/error/ERROR/p'
+```
+
+Only shows lines containing "error".
+
+## Related Commands
+
+- [`grep`](/commands/grep) - Search for patterns
+- [`cut`](/commands/cut) - Extract fields from lines
+- [`sort`](/commands/sort) - Sort lines of text

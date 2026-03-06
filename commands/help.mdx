@@ -1,0 +1,349 @@
+---
+title: help
+description: Display comprehensive command reference and syntax guide
+---
+
+## Overview
+
+The `help` command displays a complete reference of all Nash commands, their options, and shell syntax. It provides quick access to command usage information directly from the command line.
+
+## Syntax
+
+```bash
+help [COMMAND]
+```
+
+## Description
+
+The `help` command shows comprehensive documentation for Nash, including:
+
+- All available built-in commands with descriptions
+- Command-line options and flags
+- Shell syntax features (pipes, redirects, chaining, etc.)
+- Usage examples
+
+<Note>
+Currently, the Nash `help` command displays all available commands and syntax in a single reference. Command-specific help may be added in future versions.
+</Note>
+
+## Examples
+
+### Display Help
+
+```bash
+help
+```
+
+### View Help Output
+
+```bash
+help | head -20
+# View first 20 lines of help
+```
+
+### Search Help
+
+```bash
+help | grep jq
+# Find jq-related information
+```
+
+### Save Help to File
+
+```bash
+help > nash-reference.txt
+cat nash-reference.txt
+```
+
+## Help Content Overview
+
+The help output includes these sections:
+
+### Available Commands
+
+Complete list of all 28+ built-in commands:
+
+<CodeGroup>
+```bash File Operations
+cat    [-n] [file...]       Print file(s) or stdin
+cp     SRC DST              Copy file
+mv     SRC DST              Move or rename file
+rm     [-r] [-rf] PATH...   Remove file or directory
+touch  FILE...              Create empty file
+```
+
+```bash Text Processing
+grep   [-v] [-i] [-n] PATTERN [file...]  Filter lines
+sed    EXPR [file...]       Stream editor
+cut    -d D -f N [file...]  Cut fields from lines
+sort   [-r] [-u] [file...]  Sort lines
+uniq   [-c] [-d] [-u]       Filter adjacent duplicates
+wc     [-l] [-w] [-c]       Count lines/words/bytes
+head   [-n N] [file...]     First N lines (default 10)
+tail   [-n N] [file...]     Last N lines (default 10)
+```
+
+```bash Directory Operations
+ls     [-l] [-a] [path...]  List directory contents
+cd     [dir]                Change working directory
+pwd                         Print working directory
+mkdir  [-p] DIR...          Create directory
+tree   [-L N] [-a] [path]   Directory tree view
+find   [path] [options]     Search for files
+```
+
+```bash Data Processing
+jq     FILTER [file]        Process JSON data
+file   [path...]            Detect file type
+stat   [path...]            File status info
+```
+
+```bash Environment
+env                         List environment variables
+export KEY=VALUE            Set environment variable
+unset  VAR...               Unset environment variable
+echo   [-n] [-e] [text...]  Print text
+```
+
+```bash Utilities
+clear                       Clear the terminal screen
+help   [command]            Show this help
+history [N]                 Show command history
+which  CMD...               Show command location
+test   EXPR / [ EXPR ]      Evaluate expression
+true                        Exit with code 0
+false                       Exit with code 1
+```
+</CodeGroup>
+
+### Syntax Reference
+
+Shell features and syntax:
+
+```bash
+# Simple command
+cmd arg
+
+# Pipe stdout to stdin
+cmd | cmd
+
+# Redirect stdout (overwrite)
+cmd > file
+
+# Redirect stdout (append)
+cmd >> file
+
+# Read stdin from file
+cmd < file
+
+# Run second if first succeeds
+cmd && cmd
+
+# Run second if first fails
+cmd || cmd
+
+# Run both unconditionally
+cmd ; cmd
+
+# Subshell (isolated environment)
+( cmd )
+
+# Variable expansion
+$VAR  ${VAR}
+
+# Command substitution
+$(cmd)
+
+# Quoting
+'text'  "text"
+
+# Comments
+# comment
+```
+
+### Test Operators
+
+File, string, and numeric test operators:
+
+```bash
+test EXPR / [ EXPR ]      Evaluate expression
+  -f FILE   true if regular file
+  -d FILE   true if directory
+  -e FILE   true if exists
+  -z STR    true if empty string
+  -n STR    true if non-empty string
+  = != -eq -ne -lt -le -gt -ge
+```
+
+## Practical Use Cases
+
+### Quick Reference
+
+```bash
+# Forgot a command's options
+help | grep grep
+# Output:
+#   grep   [-v] [-i] [-n] PATTERN [file...]  Filter lines
+```
+
+### Learn Available Commands
+
+```bash
+# See what commands are available
+help | grep -A 30 "AVAILABLE COMMANDS"
+```
+
+### Syntax Lookup
+
+```bash
+# How do I do pipes again?
+help | grep pipe
+# Output:
+#   cmd | cmd            Pipe stdout to stdin
+```
+
+### Find Command by Function
+
+```bash
+# What command searches for files?
+help | grep -i search
+# Output:
+#   find   [path] [options]     Search for files
+```
+
+### Export Reference
+
+```bash
+# Save help for offline reference
+help > ~/nash-help.txt
+
+# View later
+cat ~/nash-help.txt | grep test
+```
+
+### Script Documentation
+
+```bash
+# Add help reference at top of script
+echo "#!/usr/bin/env nash" > script.sh
+echo "# Run 'help' for command reference" >> script.sh
+echo "" >> script.sh
+echo "ls -la" >> script.sh
+```
+
+## Using Help with Other Commands
+
+<CodeGroup>
+```bash Search for specific command
+help | grep "jq"
+```
+
+```bash Find redirect syntax
+help | grep ">"
+```
+
+```bash Count available commands
+help | grep -c "^  [a-z]"
+```
+
+```bash Extract just command names
+help | grep "^  [a-z]" | cut -d' ' -f3
+```
+</CodeGroup>
+
+## Paging Long Output
+
+<Warning>
+The help output is quite long. While Nash doesn't have a built-in pager like `less`, you can use:
+
+```bash
+# View first 20 lines
+help | head -20
+
+# View specific section
+help | grep -A 10 "SYNTAX"
+
+# Save and view
+help > help.txt
+cat help.txt
+```
+</Warning>
+
+## Help vs. Documentation
+
+<Tabs>
+  <Tab title="help command">
+    Quick reference built into Nash:
+    ```bash
+    help
+    # Shows all commands and syntax
+    ```
+  </Tab>
+  <Tab title="External docs">
+    Comprehensive online documentation:
+    - Detailed examples
+    - Use cases
+    - Best practices
+    - Interactive guides
+  </Tab>
+</Tabs>
+
+## Finding Specific Information
+
+```bash
+# Find all flag options
+help | grep "\[-"
+
+# Find redirect operators
+help | grep -E "(>|<|>>)"
+
+# Find test operators
+help | grep "test" -A 7
+
+# Find chaining syntax
+help | grep -E "(&&|\|\|)"
+```
+
+## Common Patterns
+
+### Quick Command Lookup
+
+```bash
+# Forgot grep options
+help | grep "grep"
+# Output:   grep   [-v] [-i] [-n] PATTERN [file...]  Filter lines
+```
+
+### Verify Command Exists
+
+```bash
+# Does Nash have a sort command?
+help | grep -q "sort" && echo "Yes" || echo "No"
+# Output: Yes
+```
+
+### List All Commands
+
+```bash
+# Extract command names only
+help | grep "^  [a-z]" | cut -d' ' -f3 | sort
+```
+
+## Exit Status
+
+The `help` command always returns exit code `0` (success).
+
+## Notes
+
+<Note>
+- Help is displayed on stdout, not stderr
+- Help output can be piped and redirected
+- The help text is comprehensive but concise
+- Future versions may support command-specific help: `help COMMAND`
+- Help shows syntax, not detailed examples (see online docs for examples)
+</Note>
+
+## Related Commands
+
+- [`which`](/commands/which) - Check if specific commands exist
+- [`history`](/commands/history) - View previously executed commands

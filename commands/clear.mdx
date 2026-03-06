@@ -1,0 +1,344 @@
+---
+title: clear
+description: Clear the terminal screen
+---
+
+## Overview
+
+The `clear` command clears the terminal screen and moves the cursor to the top-left position. It provides a clean workspace by removing all previous output from view.
+
+## Syntax
+
+```bash
+clear
+```
+
+## Description
+
+The `clear` command sends ANSI escape sequences to the terminal to:
+1. Clear the entire screen (`\x1b[2J`)
+2. Move the cursor to the home position (top-left: `\x1b[H`)
+
+This effectively gives you a fresh terminal view, though the command history is preserved.
+
+## Options
+
+<Note>
+The `clear` command does not accept any options, flags, or arguments.
+</Note>
+
+## Examples
+
+### Basic Usage
+
+```bash
+clear
+# Screen is cleared, cursor moves to top-left
+```
+
+### Clear Between Tasks
+
+```bash
+ls -la
+cat file.txt
+grep pattern data.txt
+
+# Clear screen before starting new task
+clear
+
+echo "Starting new task"
+```
+
+### Clear in Scripts
+
+```bash
+# script.sh
+echo "Processing data..."
+cat data.txt | grep important
+
+# Clear before showing results
+clear
+echo "Results:"
+grep -c important data.txt
+```
+
+## Practical Use Cases
+
+### Clean Workspace
+
+```bash
+# After lots of output, clear for readability
+find / -name "*.txt"
+# ... lots of output ...
+
+clear
+echo "Ready for next command"
+```
+
+### Script Sections
+
+```bash
+# Separate script sections visually
+echo "Step 1: Preparation"
+mkdir -p output
+
+clear
+echo "Step 2: Processing"
+cat input.txt | grep data > output/result.txt
+
+clear
+echo "Step 3: Complete"
+ls -l output/
+```
+
+### Interactive Menus
+
+```bash
+# Simple menu script
+while true; do
+  clear
+  echo "=== Main Menu ==="
+  echo "1. Show files"
+  echo "2. Show environment"
+  echo "3. Exit"
+  echo ""
+  # ... handle input ...
+done
+```
+
+### Before Important Output
+
+```bash
+# Clear before showing important information
+clear
+echo "======================"
+echo "  CRITICAL ALERT"
+echo "======================"
+echo "System status: ERROR"
+```
+
+### Development Workflow
+
+```bash
+# Clear before each test run
+clear
+echo "Running tests..."
+# run tests
+```
+
+### Demonstration Scripts
+
+```bash
+# Demo script with clear sections
+clear
+echo "Demo: File Operations"
+echo ""
+echo "Creating files..."
+touch demo1.txt demo2.txt
+ls -l demo*.txt
+
+echo ""
+echo "Press enter to continue"
+read
+
+clear
+echo "Demo: Text Processing"
+echo ""
+echo "hello world" | grep hello
+```
+
+## Terminal Behavior
+
+<Note>
+The `clear` command:
+
+- **Does clear:** Visible terminal output
+- **Does clear:** Screen contents
+- **Does NOT clear:** Command history (use `history` to view)
+- **Does NOT clear:** Scrollback buffer (may vary by terminal)
+- **Does NOT clear:** Environment variables
+- **Does NOT clear:** Working directory
+</Note>
+
+## ANSI Escape Sequences
+
+Under the hood, `clear` outputs:
+
+```
+\x1b[2J   - Clear entire screen
+\x1b[H    - Move cursor to home (1,1)
+```
+
+This is equivalent to:
+
+```bash
+echo -e "\x1b[2J\x1b[H"
+```
+
+## Alternative Methods
+
+<Tabs>
+  <Tab title="clear command">
+    ```bash
+    clear
+    # Simplest and most portable
+    ```
+  </Tab>
+  <Tab title="echo with ANSI">
+    ```bash
+    echo -e "\x1b[2J\x1b[H"
+    # Manual escape sequence
+    ```
+  </Tab>
+  <Tab title="Multiple newlines">
+    ```bash
+    echo "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+    # Poor alternative (doesn't truly clear)
+    ```
+  </Tab>
+</Tabs>
+
+## Combining with Other Commands
+
+<CodeGroup>
+```bash Clear and show directory
+clear && ls -la
+```
+
+```bash Clear and show status
+clear && pwd && echo "Ready"
+```
+
+```bash Clear between operations
+grep pattern file.txt
+clear
+grep other-pattern file.txt
+```
+
+```bash Clear and display info
+clear && echo "Current directory: $(pwd)"
+```
+</CodeGroup>
+
+## In Loops and Scripts
+
+### Updating Display
+
+```bash
+# Simulate updating display
+for i in 1 2 3 4 5; do
+  clear
+  echo "Processing step $i/5..."
+  # simulate work
+done
+
+clear
+echo "Complete!"
+```
+
+### Progress Indicator
+
+```bash
+# Show progress on clean screen
+COUNT=0
+while [ "$COUNT" -lt 10 ]; do
+  clear
+  echo "Progress: $COUNT/10"
+  COUNT=$((COUNT + 1))
+done
+```
+
+## Common Patterns
+
+### Clear Before Error Messages
+
+```bash
+if test ! -f config.json; then
+  clear
+  echo "ERROR: config.json not found"
+  exit 1
+fi
+```
+
+### Clear After Verbose Output
+
+```bash
+find . -name "*.log"  # potentially lots of output
+clear
+echo "Search complete"
+```
+
+### Clear for User Interaction
+
+```bash
+clear
+echo "Enter your name:"
+read NAME
+echo "Hello, $NAME"
+```
+
+## Terminal Compatibility
+
+<Warning>
+The `clear` command uses ANSI escape sequences that are supported by most modern terminals:
+
+- ✅ xterm, xterm-256color
+- ✅ VT100/VT220 terminals  
+- ✅ Modern terminal emulators (iTerm2, Terminal.app, GNOME Terminal, etc.)
+- ❌ Very old or non-ANSI terminals may not support this
+
+Nash defaults to `TERM=xterm-256color`, so `clear` should work in most environments.
+</Warning>
+
+## Scrollback Buffer
+
+<Note>
+Most terminals maintain a scrollback buffer:
+
+```bash
+echo "line 1"
+echo "line 2"
+echo "line 3"
+clear
+# Screen is clear, but you can scroll up to see previous lines
+```
+
+The `clear` command does not clear the scrollback buffer—only the visible screen.
+</Note>
+
+## Shell State Preservation
+
+After `clear`, all shell state is preserved:
+
+```bash
+export MY_VAR=value
+cd /home/user/projects
+clear
+
+# State is preserved
+echo $MY_VAR          # Output: value
+pwd                    # Output: /home/user/projects
+history | tail -5      # Shows commands before clear
+```
+
+## Notes
+
+<Note>
+- The `clear` command has no options or arguments
+- It always returns exit code 0 (success)
+- Command history is not affected
+- Environment variables remain unchanged
+- Current directory remains unchanged
+- Useful for script readability and organization
+- Does not affect terminal scrollback buffer
+</Note>
+
+## Exit Status
+
+The `clear` command always returns exit code `0` (success).
+
+## Related Commands
+
+- [echo](/commands/echo) - Print text to screen
+- [history](/commands/history) - View command history
+- [help](/commands/help) - Display help information

@@ -1,0 +1,395 @@
+---
+title: sort
+description: Sort lines of text
+---
+
+## Syntax
+
+```bash
+sort [OPTIONS] [FILE...]
+```
+
+## Description
+
+The `sort` command arranges lines of text in order. By default, it performs ascending lexicographic (alphabetical) sorting. It's essential for organizing data, finding patterns, and preparing input for commands like `uniq`.
+
+Nash's `sort` operates entirely in-memory and supports both regular and reverse sorting, with an option to remove duplicates during the sort process.
+
+## Options
+
+<ParamField path="-r" type="flag">
+  Reverse the sorting order. Sort from Z to A, or highest to lowest.
+</ParamField>
+
+<ParamField path="-u" type="flag">
+  Unique mode. Output only unique lines, removing adjacent duplicates after sorting.
+  
+  Equivalent to `sort | uniq`.
+</ParamField>
+
+## Examples
+
+### Basic alphabetical sort
+
+```bash
+echo -e "cherry\napple\nbanana" | sort
+```
+
+<CodeGroup>
+```bash Output
+apple
+banana
+cherry
+```
+</CodeGroup>
+
+### Reverse sort
+
+```bash
+echo -e "apple\nbanana\ncherry" | sort -r
+```
+
+<CodeGroup>
+```bash Output
+cherry
+banana
+apple
+```
+</CodeGroup>
+
+### Sort with duplicates
+
+```bash
+echo -e "dog\ncat\ndog\napple\ncat" | sort
+```
+
+<CodeGroup>
+```bash Output
+apple
+cat
+cat
+dog
+dog
+```
+</CodeGroup>
+
+### Unique sort
+
+```bash
+echo -e "dog\ncat\ndog\napple\ncat" | sort -u
+```
+
+<CodeGroup>
+```bash Output
+apple
+cat
+dog
+```
+</CodeGroup>
+
+### Sort numbers (lexicographic)
+
+```bash
+echo -e "10\n2\n1\n20" | sort
+```
+
+<CodeGroup>
+```bash Output
+1
+10
+2
+20
+```
+</CodeGroup>
+
+<Note>
+Nash's sort performs lexicographic (string) sorting. Numbers are sorted as text, so "10" comes before "2" because "1" < "2" alphabetically.
+</Note>
+
+### Sort file contents
+
+```bash
+echo -e "zebra\napple\nmango" > fruits.txt
+sort fruits.txt
+```
+
+<CodeGroup>
+```bash Output
+apple
+mango
+zebra
+```
+</CodeGroup>
+
+### Case sensitivity
+
+```bash
+echo -e "Zebra\napple\nMango" | sort
+```
+
+<CodeGroup>
+```bash Output
+Mango
+Zebra
+apple
+```
+</CodeGroup>
+
+Uppercase letters come before lowercase in ASCII order.
+
+## Pipeline Examples
+
+### Sort then filter duplicates
+
+```bash
+cat access.log | cut -d' ' -f1 | sort | uniq
+```
+
+Extracts IP addresses, sorts them, and shows unique values.
+
+### Count occurrences
+
+```bash
+cat errors.log | sort | uniq -c | sort -r
+```
+
+1. Sort error messages
+2. Count each unique message
+3. Sort by count (descending)
+
+### Find common items
+
+```bash
+sort file1.txt file2.txt | uniq -d
+```
+
+Finds lines that appear in both files.
+
+### Top N items
+
+```bash
+cat data.txt | sort | uniq -c | sort -r | head -10
+```
+
+Shows the 10 most frequent items.
+
+### Reverse unique sort
+
+```bash
+echo -e "a\nc\nb\na\nb" | sort -ru
+```
+
+<CodeGroup>
+```bash Output
+c
+b
+a
+```
+</CodeGroup>
+
+## Practical Use Cases
+
+### Organize list of names
+
+```bash
+cat attendees.txt | sort > attendees-sorted.txt
+```
+
+### Deduplicate email list
+
+```bash
+cat emails.txt | sort -u > unique-emails.txt
+```
+
+### Find duplicate entries
+
+```bash
+sort inventory.txt | uniq -d
+```
+
+Shows only items that appear more than once.
+
+### Prepare for uniq
+
+```bash
+cat logs.txt | sort | uniq -c
+```
+
+`uniq` only removes adjacent duplicates, so sort first.
+
+### Alphabetize configuration
+
+```bash
+cat .env | grep -v "^#" | sort
+```
+
+Sort environment variables, skipping comments.
+
+### Find all unique words
+
+```bash
+cat document.txt | tr ' ' '\n' | sort -u
+```
+
+Splits text into words and lists unique ones.
+
+### Merge and sort files
+
+```bash
+sort file1.txt file2.txt file3.txt > combined-sorted.txt
+```
+
+## Advanced Examples
+
+### Sort and reverse
+
+```bash
+echo -e "3\n1\n2" | sort -r
+```
+
+<CodeGroup>
+```bash Output
+3
+2
+1
+```
+</CodeGroup>
+
+### Extract and sort unique fields
+
+```bash
+cat data.csv | cut -d, -f2 | sort -u
+```
+
+Extracts second column and sorts unique values.
+
+### Sort by multiple criteria (simulated)
+
+```bash
+cat data.txt | sort | sort -s -k2
+```
+
+Note: Nash's sort doesn't support field keys, but you can preprocess with `cut`.
+
+### Remove blank lines and sort
+
+```bash
+cat file.txt | grep -v "^$" | sort
+```
+
+### Sort then process
+
+```bash
+ls | sort -r | head -5
+```
+
+Shows the last 5 files alphabetically.
+
+## Comparing Sort Options
+
+<Tabs>
+  <Tab title="Default">
+    ```bash
+    echo -e "c\na\nb" | sort
+    ```
+    
+    Output:
+    ```
+    a
+    b
+    c
+    ```
+  </Tab>
+  
+  <Tab title="Reverse">
+    ```bash
+    echo -e "c\na\nb" | sort -r
+    ```
+    
+    Output:
+    ```
+    c
+    b
+    a
+    ```
+  </Tab>
+  
+  <Tab title="Unique">
+    ```bash
+    echo -e "c\na\nb\na" | sort -u
+    ```
+    
+    Output:
+    ```
+    a
+    b
+    c
+    ```
+  </Tab>
+  
+  <Tab title="Reverse Unique">
+    ```bash
+    echo -e "c\na\nb\na" | sort -ru
+    ```
+    
+    Output:
+    ```
+    c
+    b
+    a
+    ```
+  </Tab>
+</Tabs>
+
+## Tips
+
+### Always sort before uniq
+
+`uniq` only removes adjacent duplicates:
+
+```bash
+# Wrong - won't remove all duplicates
+echo -e "a\nb\na" | uniq
+
+# Right - sort first
+echo -e "a\nb\na" | sort | uniq
+```
+
+### Use -u for efficiency
+
+Instead of:
+```bash
+sort file.txt | uniq
+```
+
+Use:
+```bash
+sort -u file.txt
+```
+
+### Stable sort
+
+Nash's sort preserves the relative order of equal elements (stable sort).
+
+### Empty lines
+
+Empty lines sort to the beginning:
+
+```bash
+echo -e "b\n\na" | sort  # Empty line appears first
+```
+
+## Performance
+
+<Note>
+Nash's sort loads all input into memory, sorts it, then outputs the result. For very large datasets, consider processing in chunks or using the `-u` flag to reduce output size.
+</Note>
+
+## Related Commands
+
+- [uniq](/commands/uniq) - Filter duplicate lines
+- [cut](/commands/cut) - Extract fields for sorting
+- [grep](/commands/grep) - Filter before sorting
+- [head](/commands/head-tail) - View top N sorted items
+- [tail](/commands/head-tail) - View bottom N sorted items
+- [wc](/commands/wc) - Count sorted output

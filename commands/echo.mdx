@@ -1,0 +1,206 @@
+---
+title: echo
+description: Print text to standard output
+---
+
+## Syntax
+
+```bash
+echo [OPTIONS] [STRING...]
+```
+
+## Description
+
+The `echo` command writes its arguments to standard output, separated by spaces and followed by a newline. It's one of the most fundamental commands for displaying text, debugging scripts, and creating simple output.
+
+Unlike system shells, Nash's `echo` runs entirely in-memory with no external process calls.
+
+## Options
+
+<ParamField path="-n" type="flag">
+  Suppress the trailing newline. Output ends immediately after the last argument.
+</ParamField>
+
+<ParamField path="-e" type="flag">
+  Enable interpretation of backslash escape sequences:
+  - `\n` - newline
+  - `\t` - horizontal tab
+  - `\r` - carriage return
+  - `\\` - backslash
+</ParamField>
+
+## Examples
+
+### Basic output
+
+```bash
+echo Hello, World!
+```
+
+<CodeGroup>
+```bash Output
+Hello, World!
+```
+</CodeGroup>
+
+### Multiple arguments
+
+```bash
+echo one two three
+```
+
+<CodeGroup>
+```bash Output
+one two three
+```
+</CodeGroup>
+
+### Suppress trailing newline
+
+```bash
+echo -n "Loading"
+echo "..."
+```
+
+<CodeGroup>
+```bash Output
+Loading...
+```
+</CodeGroup>
+
+### Using escape sequences
+
+```bash
+echo -e "Line 1\nLine 2\nLine 3"
+```
+
+<CodeGroup>
+```bash Output
+Line 1
+Line 2
+Line 3
+```
+</CodeGroup>
+
+### Tab-separated values
+
+```bash
+echo -e "Name\tAge\tCity"
+echo -e "Alice\t30\tNew York"
+```
+
+<CodeGroup>
+```bash Output
+Name    Age     City
+Alice   30      New York
+```
+</CodeGroup>
+
+### Variable expansion
+
+```bash
+echo "Current user: $USER"
+echo "Home directory: $HOME"
+```
+
+<CodeGroup>
+```bash Output
+Current user: user
+Home directory: /home/user
+```
+</CodeGroup>
+
+## Pipeline Examples
+
+### Create content for grep
+
+```bash
+echo -e "apple\nbanana\napricot" | grep ap
+```
+
+<CodeGroup>
+```bash Output
+apple
+apricot
+```
+</CodeGroup>
+
+### Generate test data
+
+```bash
+echo "hello world" | wc -w
+```
+
+<CodeGroup>
+```bash Output
+       2
+```
+</CodeGroup>
+
+### Write to file
+
+```bash
+echo "Configuration data" > config.txt
+cat config.txt
+```
+
+<CodeGroup>
+```bash Output
+Configuration data
+```
+</CodeGroup>
+
+### Append to file
+
+```bash
+echo "Line 1" > file.txt
+echo "Line 2" >> file.txt
+cat file.txt
+```
+
+<CodeGroup>
+```bash Output
+Line 1
+Line 2
+```
+</CodeGroup>
+
+## Practical Use Cases
+
+### Script debugging
+
+```bash
+echo "Starting deployment..."
+cp src/* dist/
+echo "Deployment complete!"
+```
+
+### Creating CSV data
+
+```bash
+echo "id,name,value" > data.csv
+echo "1,Item A,100" >> data.csv
+echo "2,Item B,200" >> data.csv
+```
+
+### Status messages
+
+```bash
+test -f config.json && echo "Config found" || echo "Config missing"
+```
+
+### Environment inspection
+
+```bash
+echo "PATH: $PATH"
+echo "Working directory: $(pwd)"
+```
+
+## Related Commands
+
+- [`cat`](/commands/cat) - Display file contents
+- [`wc`](/commands/wc) - Count lines, words, and bytes
+
+<Note>
+Nash's `echo` automatically expands variables like `$VAR` and command substitutions like `$(cmd)`. Use single quotes to prevent expansion: `echo '$HOME'` outputs the literal text `$HOME`.
+</Note>

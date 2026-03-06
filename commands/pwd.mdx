@@ -1,0 +1,256 @@
+---
+title: 'pwd'
+description: 'Print the current working directory'
+---
+
+## Syntax
+
+```bash
+pwd
+```
+
+## Description
+
+The `pwd` (print working directory) command displays the absolute path of the current working directory within Nash's virtual filesystem. It outputs a single line containing the full path from the root `/` to your current location.
+
+<Note>
+  `pwd` always returns paths within Nash's Virtual Filesystem (VFS), not the host system's filesystem.
+</Note>
+
+## Arguments
+
+The `pwd` command takes no arguments or flags.
+
+## Behavior
+
+1. Reads the current working directory from the `$PWD` environment variable
+2. If `$PWD` is not set, falls back to the context's internal `cwd` field
+3. Outputs the absolute path followed by a newline
+4. Always succeeds with exit code 0
+
+## Examples
+
+### Basic usage
+
+```bash
+user@nash:/home/user$ pwd
+/home/user
+```
+
+### After changing directories
+
+```bash
+user@nash:/home/user$ cd /etc
+user@nash:/etc$ pwd
+/etc
+```
+
+### With relative path navigation
+
+```bash
+user@nash:/home/user$ mkdir -p projects/nash-demo
+user@nash:/home/user$ cd projects/nash-demo
+user@nash:/home/user/projects/nash-demo$ pwd
+/home/user/projects/nash-demo
+```
+
+### In subshells
+
+```bash
+user@nash:/home/user$ (cd /tmp && pwd)
+/tmp
+user@nash:/home/user$ pwd
+/home/user
+```
+
+<Note>
+  Subshells `( )` have their own working directory that doesn't affect the parent shell.
+</Note>
+
+### In command substitution
+
+```bash
+user@nash:/home/user$ cd /etc
+user@nash:/etc$ echo "Current directory: $(pwd)"
+Current directory: /etc
+```
+
+### Saving current directory
+
+```bash
+user@nash:/home/user$ SAVED=$(pwd)
+user@nash:/home/user$ cd /tmp
+user@nash:/tmp$ echo $SAVED
+/home/user
+user@nash:/tmp$ cd $SAVED
+user@nash:/home/user$ pwd
+/home/user
+```
+
+## Use Cases
+
+### Verify location before operations
+
+```bash
+user@nash:/home/user$ cd projects
+user@nash:/home/user/projects$ pwd
+/home/user/projects
+user@nash:/home/user/projects$ touch newfile.txt
+```
+
+### Script debugging
+
+```bash
+#!/usr/bin/env nash
+echo "Starting in: $(pwd)"
+cd /tmp || exit 1
+echo "Moved to: $(pwd)"
+# ... rest of script
+```
+
+### Conditional logic based on location
+
+```bash
+user@nash:/home/user$ test "$(pwd)" = "/home/user" && echo "In home directory"
+In home directory
+```
+
+### Build paths dynamically
+
+```bash
+user@nash:/home/user$ LOGFILE="$(pwd)/output.log"
+user@nash:/home/user$ echo $LOGFILE
+/home/user/output.log
+```
+
+## VFS Integration
+
+### Working with mounted directories
+
+When navigating into mounted host directories, `pwd` shows the VFS mount point path:
+
+```bash
+# Start Nash with a mount
+$ nash --bind ./myproject:/project
+
+user@nash:/home/user$ cd /project
+user@nash:/project$ pwd
+/project
+```
+
+<Note>
+  `pwd` returns the virtual path `/project`, not the host path `./myproject`.
+</Note>
+
+### Multiple mount points
+
+```bash
+$ nash --bind ./src:/workspace/src --bind ./docs:/workspace/docs
+
+user@nash:/home/user$ cd /workspace/src
+user@nash:/workspace/src$ pwd
+/workspace/src
+user@nash:/workspace/src$ cd ../docs
+user@nash:/workspace/docs$ pwd
+/workspace/docs
+```
+
+## Environment Variables
+
+<ParamField path="$PWD" type="string">
+  The current working directory path. Automatically maintained by the `cd` command and read by `pwd`.
+</ParamField>
+
+## Combining with Other Commands
+
+### With cd to toggle directories
+
+```bash
+user@nash:/etc$ cd /home/user
+user@nash:/home/user$ pwd
+/home/user
+user@nash:/home/user$ cd -
+user@nash:/etc$ pwd
+/etc
+```
+
+### With mkdir to create in current location
+
+```bash
+user@nash:/home/user$ pwd
+/home/user
+user@nash:/home/user$ mkdir $(pwd)/newdir
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  newdir/  welcome.txt
+```
+
+### With find to show absolute paths
+
+```bash
+user@nash:/home/user$ cd Documents
+user@nash:/home/user/Documents$ pwd
+/home/user/Documents
+user@nash:/home/user/Documents$ find . -name "*.txt"
+./report.txt
+./notes.txt
+```
+
+### With tree to show context
+
+```bash
+user@nash:/home/user$ pwd
+/home/user
+user@nash:/home/user$ tree -L 1
+/home/user
+├── Desktop/
+├── Documents/
+├── Downloads/
+└── welcome.txt
+
+3 directories, 1 file
+```
+
+## Output Format
+
+The `pwd` command always outputs:
+```
+<absolute-path>\n
+```
+
+Where `<absolute-path>` is the full path starting from `/`.
+
+## Exit Codes
+
+- **0** - Always succeeds (pwd cannot fail)
+
+## Related Commands
+
+- [`cd`](/commands/cd) - Change the current working directory
+- [`ls`](/commands/ls) - List contents of the current directory
+- [`tree`](/commands/tree) - Display directory tree from current location
+- [`find`](/commands/find) - Search for files starting from current directory
+
+## Implementation Details
+
+The `pwd` command is implemented in `/home/daytona/workspace/source/src/builtins/pwd.rs:8-16`. Key implementation notes:
+
+- Reads from `$PWD` environment variable first
+- Falls back to internal context `cwd` field if `$PWD` is unset
+- Always returns exit code 0 (cannot fail)
+- Takes no arguments (all arguments are ignored)
+- Output always ends with a newline character
+
+## Comparison to Traditional Unix pwd
+
+Nash's `pwd` is simpler than traditional Unix `pwd`:
+
+| Feature | Nash pwd | Unix pwd |
+|---------|----------|----------|
+| `-L` flag (logical) | Not supported (always logical) | Supported |
+| `-P` flag (physical) | Not supported | Supported |
+| Symlink resolution | N/A (VFS has no symlinks) | Resolves symlinks with `-P` |
+| Exit codes | Always 0 | Can fail with non-zero |
+
+<Note>
+  Nash's VFS doesn't support symbolic links, so there's no distinction between logical and physical paths.
+</Note>

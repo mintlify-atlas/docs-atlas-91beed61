@@ -1,0 +1,506 @@
+---
+title: Runtime Architecture
+description: Execution model, context management, and zero-syscall guarantees
+---
+
+The runtime module evaluates parsed AST expressions and manages execution context. It's the heart of Nash's sandboxed execution model — **zero system calls, ever**.
+
+## Module Structure
+
+```
+runtime/
+├── executor.rs     # AST walker with zero system calls (716 lines)
+├── context.rs      # Mutable session state (cwd, env, VFS, history)
+└── output.rs       # Command output structure
+```
+
+<Note>
+The runtime knows nothing about syntax. It receives an `Expr` tree from the parser and evaluates it recursively.
+</Note>
+
+## Execution Model
+
+Nash uses an **AST walking interpreter**. The `Executor` recursively evaluates `Expr` nodes:
+
+```
+┌──────────────────┐
+│  AST (Expr)      │  Expr::Pipe { left: Command{...}, right: Command{...} }
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  eval()          │  Pattern match on Expr variant
+│  (executor.rs)   │
+└────────┬─────────┘
+         │
+         ├─ Command   → dispatch to builtin → return Output
+         ├─ Pipe      → eval left, pass stdout to right
+         ├─ Redirect  → eval expr, write stdout to file
+         ├─ Sequence  → eval left, eval right
+         ├─ And       → eval left, if success eval right
+         ├─ Or        → eval left, if failure eval right
+         └─ Subshell  → clone context, eval, restore
+         
+         ▼
+┌──────────────────┐
+│  Output          │  { stdout, stderr, exit_code }
+└──────────────────┘
+```
+
+## Executor Structure
+
+From src/runtime/executor.rs:15-29:
+
+```rust
+pub struct ExecutorConfig {
+    pub cwd: String,
+    pub env: IndexMap<String, String>,
+    pub mounts: Vec<(String, String, MountOptions)>,
+}
+
+pub struct Executor {
+    ctx: Context,  // Mutable session state
+}
+```
+
+The executor owns a `Context` and provides methods to:
+
+- Create a sandboxed environment with VFS
+- Execute AST expressions
+- Manage command history
+- Sync environment variables
+
+### Initialization
+
+From src/runtime/executor.rs:32-117:
+
+```rust
+impl Executor {
+    pub fn new(config: ExecutorConfig, username: &str) -> Result<Self> {
+        let mut vfs = Vfs::new();
+        
+        // Apply host mounts
+        for (host, vfs_path, opts) in config.mounts {
+            vfs.mount(host, vfs_path, opts)?;
+        }
+        
+        // Create Unix directory skeleton
+        for dir in &["/bin", "/usr", "/etc", "/var", "/tmp", "/home/..."] {
+            vfs.mkdir_p(dir)?;
+        }
+        
+        // Initialize environment variables
+        let mut env = config.env;
+        env.entry("USER").or_insert(username.to_string());
+        env.entry("HOME").or_insert(format!("/home/{}", username));
+        env.entry("PATH").or_insert("/usr/local/bin:/usr/bin:/bin");
+        // ... etc
+        
+        Ok(Executor {
+            ctx: Context::new(cwd, env, vfs),
+        })
+    }
+}
+```
+
+<Info>
+The executor bootstraps a complete Unix environment including `/bin`, `/usr`, `/etc`, `/home`, and standard environment variables.
+</Info>
+
+## Context Management
+
+The `Context` structure (src/runtime/context.rs:7-16) holds all mutable session state:
+
+```rust
+pub struct Context {
+    /// Current working directory (VFS path)
+    pub cwd: String,
+    
+    /// Environment variables
+    pub env: IndexMap<String, String>,
+    
+    /// Virtual filesystem
+    pub vfs: Vfs,
+    
+    /// Command history (most recent last)
+    pub history: Vec<String>,
+}
+```
+
+Builtins receive `&mut Context`, allowing them to:
+
+- Read/write files via `ctx.vfs`
+- Change directory by mutating `ctx.cwd`
+- Set environment variables in `ctx.env`
+- Access command history from `ctx.history`
+
+## AST Evaluation
+
+The core evaluation function (src/runtime/executor.rs:152-207):
+
+```rust
+fn eval(&mut self, expr: &Expr, stdin: &str) -> Result<Output> {
+    match expr {
+        Expr::Command { name, args } => self.eval_command(name, args, stdin),
+        
+        Expr::Pipe { left, right } => {
+            let left_out = self.eval(left, stdin)?;
+            self.eval(right, &left_out.stdout)  // Pass stdout to next cmd
+        }
+        
+        Expr::Redirect { expr, file, mode } => 
+            self.eval_redirect(expr, file, mode, stdin),
+        
+        Expr::Sequence { left, right } => {
+            let left_out = self.eval(left, stdin)?;
+            // Print left output before continuing
+            print!("{}", left_out.stdout);
+            self.eval(right, stdin)
+        }
+        
+        Expr::And { left, right } => {
+            let left_out = self.eval(left, stdin)?;
+            if left_out.is_success() {
+                self.eval(right, stdin)
+            } else {
+                Ok(left_out)
+            }
+        }
+        
+        Expr::Or { left, right } => {
+            let left_out = self.eval(left, stdin)?;
+            if !left_out.is_success() {
+                self.eval(right, stdin)
+            } else {
+                Ok(left_out)
+            }
+        }
+        
+        Expr::Subshell { expr } => {
+            // Clone context to isolate changes
+            let saved_cwd = self.ctx.cwd.clone();
+            let saved_env = self.ctx.env.clone();
+            let result = self.eval(expr, stdin);
+            // Restore context
+            self.ctx.cwd = saved_cwd;
+            self.ctx.env = saved_env;
+            result
+        }
+    }
+}
+```
+
+### Command Evaluation
+
+From src/runtime/executor.rs:209-225:
+
+```rust
+fn eval_command(&mut self, name: &Word, args: &[Word], stdin: &str) -> Result<Output> {
+    // 1. Expand word parts (variables, command substitution)
+    let name_str = self.expand_word(name)?;
+    let arg_strs: Vec<String> = args
+        .iter()
+        .map(|w| self.expand_word(w))
+        .collect::<Result<Vec<_>>>()?;
+    
+    // 2. Dispatch to builtin
+    if let Some(builtin) = builtins::dispatch(&name_str) {
+        builtin.run(&arg_strs, &mut self.ctx, stdin)
+    } else {
+        Ok(Output::error(
+            127,
+            "",
+            &format!("nash: command not found: {}\n", name_str),
+        ))
+    }
+}
+```
+
+<Accordion title="Word Expansion Process">
+Words may contain multiple parts that need expansion (src/runtime/executor.rs:271-288):
+
+```rust
+fn expand_word(&mut self, word: &Word) -> Result<String> {
+    let mut result = String::new();
+    for part in &word.0 {
+        match part {
+            WordPart::Literal(s) => {
+                result.push_str(s);
+            }
+            WordPart::Variable(name) => {
+                let val = self.ctx.env.get(name).cloned().unwrap_or_default();
+                result.push_str(&val);
+            }
+            WordPart::CommandSubst(expr) => {
+                let output = self.eval(expr, "")?;
+                // Trim trailing newline (bash behavior)
+                result.push_str(output.stdout.trim_end_matches('\n'));
+            }
+        }
+    }
+    Ok(result)
+}
+```
+
+**Example:** `"Hello $USER!"` with `$USER=alice`
+
+```
+Word([
+  Literal("Hello "),
+  Variable("USER"),
+  Literal("!")
+])
+
+→ expand_word() →
+
+"Hello " + "alice" + "!" = "Hello alice!"
+```
+</Accordion>
+
+### Redirect Evaluation
+
+From src/runtime/executor.rs:227-267:
+
+```rust
+fn eval_redirect(
+    &mut self,
+    expr: &Expr,
+    file: &Word,
+    mode: &RedirectMode,
+    stdin: &str,
+) -> Result<Output> {
+    match mode {
+        RedirectMode::Input => {
+            // Read file and pass as stdin to command
+            let path = self.expand_word(file)?;
+            let abs = VfsPath::join(&self.ctx.cwd, &path);
+            let content = self.ctx.vfs.read_to_string(&abs)?;
+            self.eval(expr, &content)
+        }
+        RedirectMode::Overwrite => {
+            // Execute command, then write stdout to file
+            let output = self.eval(expr, stdin)?;
+            let path = self.expand_word(file)?;
+            let abs = VfsPath::join(&self.ctx.cwd, &path);
+            self.ctx.vfs.write_str(&abs, &output.stdout)?;
+            Ok(Output {
+                stdout: String::new(),  // Consumed by file
+                stderr: output.stderr,
+                exit_code: output.exit_code,
+            })
+        }
+        RedirectMode::Append => {
+            let output = self.eval(expr, stdin)?;
+            let path = self.expand_word(file)?;
+            let abs = VfsPath::join(&self.ctx.cwd, &path);
+            self.ctx.vfs.append(&abs, output.stdout.as_bytes().to_vec())?;
+            Ok(Output {
+                stdout: String::new(),
+                stderr: output.stderr,
+                exit_code: output.exit_code,
+            })
+        }
+    }
+}
+```
+
+## Output Handling
+
+From src/runtime/output.rs:3-37:
+
+```rust
+#[derive(Debug, Clone, Default)]
+pub struct Output {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+}
+
+impl Output {
+    pub fn success(stdout: impl Into<String>) -> Self {
+        Output {
+            stdout: stdout.into(),
+            stderr: String::new(),
+            exit_code: 0,
+        }
+    }
+    
+    pub fn error(exit_code: i32, stdout: impl Into<String>, stderr: impl Into<String>) -> Self {
+        Output {
+            stdout: stdout.into(),
+            stderr: stderr.into(),
+            exit_code,
+        }
+    }
+    
+    pub fn is_success(&self) -> bool {
+        self.exit_code == 0
+    }
+}
+```
+
+Builtins return `Output` to communicate results:
+
+```rust
+// Success with output
+Ok(Output::success("hello world\n"))
+
+// Error with message
+Ok(Output::error(1, "", "grep: pattern not found\n"))
+```
+
+## Zero System Calls Guarantee
+
+Nash **never** calls:
+
+- `std::process::Command`
+- `std::process::Child`
+- Shell invocations (`bash -c`, `sh -c`)
+- External binaries
+
+All functionality is implemented in Rust:
+
+```rust
+// From src/runtime/executor.rs:209-225
+if let Some(builtin) = builtins::dispatch(&name_str) {
+    builtin.run(&arg_strs, &mut self.ctx, stdin)
+} else {
+    // No external command execution!
+    Ok(Output::error(127, "", "nash: command not found"))
+}
+```
+
+<Info>
+You can verify this guarantee by grepping the codebase:
+
+```bash
+grep -r "std::process\|Command::new\|bash -c" src/
+# (no output)
+```
+</Info>
+
+## Subshell Isolation
+
+Subshells `( ... )` run in an isolated context (src/runtime/executor.rs:197-205):
+
+```rust
+Expr::Subshell { expr } => {
+    // Save current state
+    let saved_cwd = self.ctx.cwd.clone();
+    let saved_env = self.ctx.env.clone();
+    
+    // Execute in isolation
+    let result = self.eval(expr, stdin);
+    
+    // Restore state (changes don't escape)
+    self.ctx.cwd = saved_cwd;
+    self.ctx.env = saved_env;
+    
+    result
+}
+```
+
+**Example:**
+
+```bash
+export VAR=before
+(export VAR=inside; echo $VAR)   # Prints: inside
+echo $VAR                        # Prints: before
+```
+
+The environment change inside `( )` doesn't escape.
+
+## Execution Examples
+
+### Simple Command
+
+```bash
+echo hello
+```
+
+```rust
+1. eval(Expr::Command { name: "echo", args: ["hello"] }, "")
+2. expand_word("echo") → "echo"
+3. expand_word("hello") → "hello"
+4. builtins::dispatch("echo") → Some(Echo)
+5. Echo.run(["hello"], &mut ctx, "") → Output::success("hello\n")
+```
+
+### Pipe
+
+```bash
+echo hello | grep hello
+```
+
+```rust
+1. eval(Expr::Pipe { ... }, "")
+2. left_out = eval(Expr::Command { name: "echo", ... }, "")  → Output { stdout: "hello\n", ... }
+3. eval(Expr::Command { name: "grep", ... }, "hello\n")     → Output { stdout: "hello\n", ... }
+```
+
+### Conditional
+
+```bash
+mkdir test && cd test
+```
+
+```rust
+1. eval(Expr::And { ... }, "")
+2. left_out = eval(Expr::Command { name: "mkdir", ... })  → exit_code: 0
+3. left_out.is_success() → true
+4. eval(Expr::Command { name: "cd", ... })  → changes ctx.cwd
+```
+
+### Variable Expansion
+
+```bash
+echo $HOME
+```
+
+```rust
+1. eval(Expr::Command { name: "echo", args: [Word([Variable("HOME")])] })
+2. expand_word(Word([Variable("HOME")]))
+3. ctx.env.get("HOME") → Some("/home/user")
+4. Echo.run(["/home/user"], ...) → Output::success("/home/user\n")
+```
+
+### Command Substitution
+
+```bash
+echo $(pwd)
+```
+
+```rust
+1. eval(Expr::Command { name: "echo", args: [Word([CommandSubst(Expr::Command { name: "pwd" })])] })
+2. expand_word(Word([CommandSubst(...)]))
+3. eval(Expr::Command { name: "pwd" }) → Output { stdout: "/home/user\n" }
+4. trim_end_matches('\n') → "/home/user"
+5. Echo.run(["/home/user"], ...) → Output::success("/home/user\n")
+```
+
+## Testing
+
+The runtime includes 50+ integration tests (src/runtime/executor.rs:291-715):
+
+```rust
+#[test]
+fn test_pipe_echo_grep() {
+    let out = exec("echo hello | grep hello");
+    assert_eq!(out.stdout, "hello\n");
+}
+
+#[test]
+fn test_subshell_isolation() {
+    let mut executor = Executor::new(ExecutorConfig::default(), "user").unwrap();
+    executor.execute(&parse("export TESTVAR=before").unwrap()).unwrap();
+    executor.execute(&parse("(export TESTVAR=inside)").unwrap()).unwrap();
+    let out = executor.execute(&parse("echo $TESTVAR").unwrap()).unwrap();
+    assert_eq!(out.stdout, "before\n");
+}
+```
+
+## Next Steps
+
+- [VFS Architecture](/architecture/vfs) — How file operations work
+- [Builtins Architecture](/architecture/builtins) — How commands are implemented
+- [Parser Architecture](/architecture/parser) — How AST is constructed

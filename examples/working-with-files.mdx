@@ -1,0 +1,559 @@
+---
+title: Working with Files
+description: Advanced file operations including copying, searching, and text processing
+---
+
+Nash provides powerful file manipulation tools that let you work efficiently with files and directories.
+
+## Creating and Reading Files
+
+### Creating Files
+
+<Tabs>
+  <Tab title="Empty files">
+    ```bash
+    user@nash:/home/user$ touch file1.txt file2.txt file3.txt
+    user@nash:/home/user$ ls
+    file1.txt  file2.txt  file3.txt
+    ```
+  </Tab>
+
+  <Tab title="Files with content">
+    ```bash
+    user@nash:/home/user$ echo "Hello World" > greeting.txt
+    user@nash:/home/user$ cat greeting.txt
+    Hello World
+    ```
+  </Tab>
+
+  <Tab title="Multi-line files">
+    ```bash
+    user@nash:/home/user$ echo "Line 1" > document.txt
+    user@nash:/home/user$ echo "Line 2" >> document.txt
+    user@nash:/home/user$ echo "Line 3" >> document.txt
+    user@nash:/home/user$ cat document.txt
+    Line 1
+    Line 2
+    Line 3
+    ```
+  </Tab>
+</Tabs>
+
+### Reading Files
+
+<CodeGroup>
+```bash Full content
+user@nash:/home/user$ cat document.txt
+Line 1
+Line 2
+Line 3
+```
+
+```bash First lines
+user@nash:/home/user$ head -n 2 document.txt
+Line 1
+Line 2
+```
+
+```bash Last lines
+user@nash:/home/user$ tail -n 1 document.txt
+Line 3
+```
+</CodeGroup>
+
+## Copying and Moving Files
+
+### Copy Files
+
+```bash
+user@nash:/home/user$ echo "original" > source.txt
+user@nash:/home/user$ cp source.txt backup.txt
+user@nash:/home/user$ cat backup.txt
+original
+
+user@nash:/home/user$ ls
+backup.txt  source.txt
+```
+
+Copy to directory:
+
+```bash
+user@nash:/home/user$ mkdir archives
+user@nash:/home/user$ cp source.txt backup.txt archives/
+user@nash:/home/user$ ls archives/
+backup.txt  source.txt
+```
+
+### Move/Rename Files
+
+```bash
+user@nash:/home/user$ mv source.txt renamed.txt
+user@nash:/home/user$ ls
+archives/  backup.txt  renamed.txt
+
+user@nash:/home/user$ mkdir old
+user@nash:/home/user$ mv backup.txt old/
+user@nash:/home/user$ ls old/
+backup.txt
+```
+
+## Finding Files
+
+The `find` command searches for files based on various criteria.
+
+### Basic Find Operations
+
+<Steps>
+  <Step title="Find all files">
+    ```bash
+    user@nash:/home/user$ find .
+    .
+    ./Desktop
+    ./Documents
+    ./Downloads
+    ./welcome.txt
+    ./renamed.txt
+    ./old
+    ./old/backup.txt
+    ./archives
+    ./archives/backup.txt
+    ./archives/source.txt
+    ```
+  </Step>
+
+  <Step title="Find only files">
+    ```bash
+    user@nash:/home/user$ find . -type f
+    ./welcome.txt
+    ./renamed.txt
+    ./old/backup.txt
+    ./archives/backup.txt
+    ./archives/source.txt
+    ```
+  </Step>
+
+  <Step title="Find only directories">
+    ```bash
+    user@nash:/home/user$ find . -type d
+    .
+    ./Desktop
+    ./Documents
+    ./Downloads
+    ./old
+    ./archives
+    ```
+  </Step>
+</Steps>
+
+### Find by Name Pattern
+
+```bash
+user@nash:/home/user$ touch app.js utils.js config.json package.json
+
+user@nash:/home/user$ find . -name "*.js"
+./app.js
+./utils.js
+
+user@nash:/home/user$ find . -name "*.json"
+./config.json
+./package.json
+
+user@nash:/home/user$ find . -name "*backup*"
+./old/backup.txt
+./archives/backup.txt
+```
+
+### Find with Depth Limit
+
+```bash
+user@nash:/home/user$ mkdir -p deep/nested/structure
+user@nash:/home/user$ touch deep/file1.txt
+user@nash:/home/user$ touch deep/nested/file2.txt
+user@nash:/home/user$ touch deep/nested/structure/file3.txt
+
+user@nash:/home/user$ find deep -type f
+deep/file1.txt
+deep/nested/file2.txt
+deep/nested/structure/file3.txt
+
+user@nash:/home/user$ find deep -maxdepth 1 -type f
+deep/file1.txt
+
+user@nash:/home/user$ find deep -maxdepth 2 -type f
+deep/file1.txt
+deep/nested/file2.txt
+```
+
+## Text Processing with Grep
+
+The `grep` command searches for patterns in text.
+
+### Basic Grep
+
+```bash
+user@nash:/home/user$ cat > employees.txt
+Alice Developer
+Bob Designer
+Charlie Developer
+Diana Manager
+Eve Developer
+
+user@nash:/home/user$ grep "Developer" employees.txt
+Alice Developer
+Charlie Developer
+Eve Developer
+
+user@nash:/home/user$ grep "Manager" employees.txt
+Diana Manager
+```
+
+### Grep Options
+
+<Tabs>
+  <Tab title="Case-insensitive">
+    ```bash
+    user@nash:/home/user$ grep -i "developer" employees.txt
+    Alice Developer
+    Charlie Developer
+    Eve Developer
+    ```
+  </Tab>
+
+  <Tab title="Line numbers">
+    ```bash
+    user@nash:/home/user$ grep -n "Developer" employees.txt
+    1:Alice Developer
+    3:Charlie Developer
+    5:Eve Developer
+    ```
+  </Tab>
+
+  <Tab title="Invert match">
+    ```bash
+    user@nash:/home/user$ grep -v "Developer" employees.txt
+    Bob Designer
+    Diana Manager
+    ```
+  </Tab>
+</Tabs>
+
+### Grep with Pipes
+
+```bash
+user@nash:/home/user$ cat employees.txt | grep "Developer" | wc -l
+3
+
+user@nash:/home/user$ ls | grep ".txt$"
+employees.txt
+file1.txt
+welcome.txt
+
+user@nash:/home/user$ env | grep "HOME"
+HOME=/home/user
+```
+
+## Stream Editing with Sed
+
+The `sed` command performs text transformations.
+
+### Substitution
+
+```bash
+user@nash:/home/user$ echo "Hello World" | sed 's/World/Nash/'
+Hello Nash
+
+user@nash:/home/user$ echo "foo foo foo" | sed 's/foo/bar/'
+bar foo foo
+
+user@nash:/home/user$ echo "foo foo foo" | sed 's/foo/bar/g'
+bar bar bar
+```
+
+### Sed on Files
+
+```bash
+user@nash:/home/user$ cat > config.txt
+server=localhost
+port=8080
+server=localhost
+
+user@nash:/home/user$ sed 's/localhost/0.0.0.0/' config.txt
+server=0.0.0.0
+port=8080
+server=localhost
+
+user@nash:/home/user$ sed 's/localhost/0.0.0.0/g' config.txt
+server=0.0.0.0
+port=8080
+server=0.0.0.0
+```
+
+### Line Deletion
+
+```bash
+user@nash:/home/user$ cat > numbers.txt
+line 1
+line 2
+line 3
+line 4
+
+user@nash:/home/user$ sed '2d' numbers.txt
+line 1
+line 3
+line 4
+
+user@nash:/home/user$ sed 'd' numbers.txt
+
+```
+
+## Field Extraction with Cut
+
+The `cut` command extracts specific fields from text.
+
+### Cut by Delimiter
+
+```bash
+user@nash:/home/user$ cat > data.csv
+Alice,30,Engineer
+Bob,25,Designer
+Charlie,35,Manager
+
+user@nash:/home/user$ cut -d',' -f1 data.csv
+Alice
+Bob
+Charlie
+
+user@nash:/home/user$ cut -d',' -f2 data.csv
+30
+25
+35
+
+user@nash:/home/user$ cut -d',' -f1,3 data.csv
+Alice,Engineer
+Bob,Designer
+Charlie,Manager
+```
+
+### Cut by Character Position
+
+```bash
+user@nash:/home/user$ echo "ABCDEFGH" | cut -c1-3
+ABC
+
+user@nash:/home/user$ echo "ABCDEFGH" | cut -c5-8
+EFGH
+
+user@nash:/home/user$ echo "ABCDEFGH" | cut -c1,3,5
+ACE
+```
+
+## JSON Processing with jq
+
+The `jq` command is a powerful JSON processor.
+
+### Basic jq Operations
+
+```bash
+user@nash:/home/user$ cat > user.json
+{
+  "name": "Alice",
+  "age": 30,
+  "email": "alice@example.com",
+  "active": true
+}
+
+user@nash:/home/user$ cat user.json | jq '.'
+{
+  "name": "Alice",
+  "age": 30,
+  "email": "alice@example.com",
+  "active": true
+}
+
+user@nash:/home/user$ cat user.json | jq '.name'
+"Alice"
+
+user@nash:/home/user$ cat user.json | jq '.age'
+30
+
+user@nash:/home/user$ cat user.json | jq -r '.email'
+alice@example.com
+```
+
+### Working with Arrays
+
+```bash
+user@nash:/home/user$ cat > users.json
+[
+  {"id": 1, "name": "Alice"},
+  {"id": 2, "name": "Bob"},
+  {"id": 3, "name": "Charlie"}
+]
+
+user@nash:/home/user$ cat users.json | jq '.[0]'
+{
+  "id": 1,
+  "name": "Alice"
+}
+
+user@nash:/home/user$ cat users.json | jq '.[1].name'
+"Bob"
+
+user@nash:/home/user$ cat users.json | jq '.[]'
+{
+  "id": 1,
+  "name": "Alice"
+}
+{
+  "id": 2,
+  "name": "Bob"
+}
+{
+  "id": 3,
+  "name": "Charlie"
+}
+```
+
+### jq Filters
+
+<CodeGroup>
+```bash Keys
+user@nash:/home/user$ echo '{"a":1,"b":2,"c":3}' | jq 'keys'
+[
+  "a",
+  "b",
+  "c"
+]
+```
+
+```bash Values
+user@nash:/home/user$ echo '{"a":1,"b":2,"c":3}' | jq 'values'
+[
+  1,
+  2,
+  3
+]
+```
+
+```bash Length
+user@nash:/home/user$ echo '[1,2,3,4,5]' | jq 'length'
+5
+
+user@nash:/home/user$ echo '{"a":1,"b":2}' | jq 'length'
+2
+```
+
+```bash Type
+user@nash:/home/user$ echo '"hello"' | jq 'type'
+"string"
+
+user@nash:/home/user$ echo '[1,2,3]' | jq 'type'
+"array"
+```
+</CodeGroup>
+
+## Directory Tree View
+
+The `tree` command shows directory structure:
+
+```bash
+user@nash:/home/user$ mkdir -p project/{src,tests,docs}
+user@nash:/home/user$ touch project/README.md
+user@nash:/home/user$ touch project/src/main.js project/src/utils.js
+user@nash:/home/user$ touch project/tests/test.js
+user@nash:/home/user$ touch project/docs/guide.md
+
+user@nash:/home/user$ tree project
+project
+├── README.md
+├── docs/
+│   └── guide.md
+├── src/
+│   ├── main.js
+│   └── utils.js
+└── tests/
+    └── test.js
+
+3 directories, 5 files
+
+user@nash:/home/user$ tree -L 1 project
+project
+├── README.md
+├── docs/
+├── src/
+└── tests/
+
+3 directories, 1 file
+```
+
+## Complete Workflow Example
+
+```bash
+user@nash:/home/user$ mkdir data_analysis && cd data_analysis
+
+user@nash:/home/user/data_analysis$ cat > sales.csv
+date,product,quantity,price
+2024-01-01,laptop,2,1200
+2024-01-02,mouse,5,25
+2024-01-02,keyboard,3,80
+2024-01-03,laptop,1,1200
+2024-01-03,mouse,10,25
+
+user@nash:/home/user/data_analysis$ cat sales.csv | grep -v "^date" | wc -l
+5
+
+user@nash:/home/user/data_analysis$ cat sales.csv | grep "laptop"
+date,product,quantity,price
+2024-01-01,laptop,2,1200
+2024-01-03,laptop,1,1200
+
+user@nash:/home/user/data_analysis$ cat sales.csv | grep -v "^date" | cut -d',' -f2 | sort | uniq
+keyboard
+laptop
+mouse
+
+user@nash:/home/user/data_analysis$ cat sales.csv | grep -v "^date" | cut -d',' -f2 | sort | uniq -c
+      1 keyboard
+      2 laptop
+      2 mouse
+
+user@nash:/home/user/data_analysis$ cat sales.csv | grep "laptop" | cut -d',' -f3 > laptop_quantities.txt
+user@nash:/home/user/data_analysis$ cat laptop_quantities.txt
+quantity
+2
+1
+
+user@nash:/home/user/data_analysis$ find . -name "*.csv" > csv_files.txt
+user@nash:/home/user/data_analysis$ find . -name "*.txt" >> csv_files.txt
+user@nash:/home/user/data_analysis$ cat csv_files.txt
+./sales.csv
+./laptop_quantities.txt
+./csv_files.txt
+
+user@nash:/home/user/data_analysis$ tree .
+.
+├── csv_files.txt
+├── laptop_quantities.txt
+└── sales.csv
+
+0 directories, 3 files
+```
+
+## Command Reference
+
+| Command | Description | Common Options |
+|---------|-------------|---------------|
+| `cp` | Copy files | source destination |
+| `mv` | Move/rename files | source destination |
+| `find` | Search for files | `-name`, `-type`, `-maxdepth` |
+| `grep` | Search text patterns | `-i`, `-n`, `-v` |
+| `sed` | Stream editor | `'s/old/new/g'`, `'Nd'` |
+| `cut` | Extract fields | `-d` (delimiter), `-f` (fields), `-c` (chars) |
+| `jq` | Process JSON | `.key`, `keys`, `values`, `length` |
+| `tree` | Directory tree | `-L` (depth), `-a` (hidden) |
+| `head` | First lines | `-n N` |
+| `tail` | Last lines | `-n N` |
+
+<Tip>
+  Combine these tools with pipes to build powerful data processing pipelines. For example: `find | grep | cut | sort | uniq`
+</Tip>

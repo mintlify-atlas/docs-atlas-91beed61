@@ -1,0 +1,328 @@
+---
+title: 'Host Mounts'
+description: 'Bind real directories into the virtual filesystem'
+---
+
+Nash isolates the host filesystem by default. To access real directories, you must explicitly mount them into the VFS using the `-B` or `--bind` flags.
+
+## Mounting with -B Flag
+
+The basic syntax is:
+
+```bash
+nash -B <host_path>:<vfs_path>
+```
+
+**Example:**
+
+```bash Mount current directory
+nash -B ./project:/project
+```
+
+Inside Nash, `/project` now mirrors the host's `./project` directory.
+
+```bash Inside Nash
+user@nash:/home/user$ ls /project
+src/  README.md  Cargo.toml
+
+user@nash:/home/user$ echo "test" > /project/output.txt
+
+user@nash:/home/user$ cat /project/output.txt
+test
+```
+
+Exiting Nash and checking the host:
+
+```bash On host
+$ ls project/
+src/  README.md  Cargo.toml  output.txt
+
+$ cat project/output.txt
+test
+```
+
+<Note>
+Changes written inside Nash to a mounted directory **persist on the host**.
+</Note>
+
+## Read-Only Mounts with --bind-ro
+
+To prevent Nash from modifying host files, use `--bind-ro`:
+
+```bash
+nash --bind-ro ./data:/data
+```
+
+**Behavior:**
+
+```bash Read-only enforcement
+user@nash:/home/user$ ls /data
+config.json
+
+user@nash:/home/user$ cat /data/config.json
+{"setting": "value"}
+
+user@nash:/home/user$ echo "hack" > /data/config.json
+Error: filesystem is read-only: /data/config.json
+```
+
+<Warning>
+Read-only mounts are enforced at the VFS layer. Even if a Nash command has write logic, the VFS will reject the operation before any data changes.
+</Warning>
+
+## Multiple Mounts
+
+You can bind multiple host directories:
+
+```bash Multiple bindings
+nash -B ./src:/src -B ./data:/data -B ./output:/output
+```
+
+Each mount is independent. You can mix read-write and read-only:
+
+```bash Mixed permissions
+nash \
+  --bind-ro ./config:/etc/config \
+  -B ./logs:/var/log \
+  -B ./workspace:/workspace
+```
+
+**Result:**
+- `/etc/config` — read-only (host `./config`)
+- `/var/log` — read-write (host `./logs`)
+- `/workspace` — read-write (host `./workspace`)
+
+## Mount Syntax
+
+The mount string format is:
+
+```
+<host_path>:<vfs_path>
+```
+
+- **`host_path`** — Real directory on your system (relative or absolute)
+- **`vfs_path`** — Where it appears inside Nash (must be absolute)
+
+### Valid Examples
+
+```bash
+# Relative host path
+nash -B ./my-project:/project
+
+# Absolute host path
+nash -B /home/alice/data:/data
+
+# Mount to nested VFS path
+nash -B ./config:/etc/app/config
+
+# Mount home directory
+nash -B ~ :/host-home
+```
+
+<Info>
+The VFS path must start with `/`. Nash will create any missing parent directories automatically.
+</Info>
+
+## How Mounts Work Internally
+
+When you specify a mount, Nash registers it in the VFS:
+
+```rust Mount registration
+// src/runtime/executor.rs
+for (host, vfs_path, opts) in config.mounts {
+    if !std::path::Path::new(&host).exists() {
+        bail!("mount: host path does not exist: {}", host);
+    }
+    vfs.mount(host, vfs_path, opts)?;
+}
+```
+
+The VFS stores mount points:
+
+```rust Mount point structure
+// src/vfs/mount.rs
+pub struct MountPoint {
+    pub host_path: String,    // "/home/user/project"
+    pub vfs_path: String,     // "/project"
+    pub opts: MountOptions,
+}
+
+pub struct MountOptions {
+    pub read_only: bool,
+}
+```
+
+When a file operation occurs, the VFS checks if the path falls under a mount:
+
+```rust Mount lookup
+// src/vfs/mod.rs
+fn find_mount(&self, vfs_path: &str) -> Option<&MountPoint> {
+    self.mounts
+        .iter()
+        .filter(|m| vfs_path == m.vfs_path 
+                 || vfs_path.starts_with(&format!("{}/", m.vfs_path)))
+        .max_by_key(|m| m.vfs_path.len())  // Most specific mount wins
+}
+```
+
+If a mount is found, the VFS translates the path and forwards the operation to `std::fs`:
+
+```rust Read through mount
+pub fn read(&self, path: &str) -> Result<Vec<u8>> {
+    let p = VfsPath::normalize(path);
+    
+    // Try in-memory first
+    if let Some(node) = self.nodes.get(&p) {
+        return /* ... */;
+    }
+    
+    // Fall back to host mount
+    if let Some(mp) = self.find_mount(&p) {
+        let rel = p.strip_prefix(&mp.vfs_path).unwrap_or("");
+        let host = format!("{}/{}", mp.host_path, rel);
+        return std::fs::read(&host)?;  // Read from real filesystem
+    }
+    
+    bail!("no such file: {}", path)
+}
+```
+
+<Accordion title="Write operations with mounts">
+```rust Write to mounted path
+pub fn write(&mut self, path: &str, data: Vec<u8>) -> Result<()> {
+    let p = VfsPath::normalize(path);
+    
+    // Check read-only protection
+    self.check_write_allowed(&p)?;
+    
+    // Try host mount first
+    if let Some(mp) = self.find_mount_mut(&p) {
+        let rel = p.strip_prefix(&mp.vfs_path).unwrap_or("");
+        let host = format!("{}/{}", mp.host_path, rel);
+        return std::fs::write(&host, &data)?;  // Write to real filesystem
+    }
+    
+    // Otherwise store in memory
+    self.nodes.insert(p, FsNode::File(data));
+    Ok(())
+}
+```
+</Accordion>
+
+## Combining Mounts with Working Directory
+
+You can start Nash in a mounted directory using `-C`:
+
+```bash
+nash -B ./src:/src -C /src
+```
+
+**Result:**
+
+```bash
+user@nash:/src$ pwd
+/src
+
+user@nash:/src$ ls
+main.rs  lib.rs
+
+user@nash:/src$ grep "fn main" main.rs
+fn main() {
+```
+
+This is useful for running scripts that expect to operate inside a project directory.
+
+## Real-World Examples
+
+### Running a build script
+
+```bash Build in sandbox
+nash \
+  -B ./project:/project \
+  -C /project \
+  -c "ls && echo 'Build complete' > build.log"
+```
+
+The `build.log` file appears in the host's `./project/` directory.
+
+### Safe data processing
+
+```bash Process data read-only
+nash \
+  --bind-ro ./input:/input \
+  -B ./output:/output \
+  -c "cat /input/data.txt | grep pattern > /output/filtered.txt"
+```
+
+- Input files are protected from accidental modification
+- Results are written to a separate output directory
+
+### Interactive exploration
+
+```bash
+nash \
+  --bind-ro ~/.config/myapp:/config \
+  -B /tmp/scratch:/scratch
+```
+
+```bash Inside Nash
+user@nash:/home/user$ cat /config/settings.toml
+# Read app config safely
+
+user@nash:/home/user$ grep "api_key" /config/settings.toml > /scratch/keys.txt
+# Extract data to temporary area
+
+user@nash:/home/user$ cat /scratch/keys.txt
+api_key = "..."
+```
+
+### Development workflow
+
+```bash Dev session
+nash \
+  -B ~/projects/myapp:/app \
+  -B ~/projects/myapp/data:/data \
+  -E NODE_ENV=development \
+  -C /app
+```
+
+```bash
+user@nash:/app$ ls
+src/  tests/  package.json
+
+user@nash:/app$ find src -name "*.js" | wc -l
+42
+
+user@nash:/app$ grep -r "TODO" src/ > /data/todos.txt
+```
+
+## Mount Priority
+
+If multiple mounts overlap, the **most specific** (longest matching prefix) wins:
+
+```bash Overlapping mounts
+nash \
+  -B ./root:/project \
+  -B ./subdir:/project/sub
+```
+
+- `/project/file.txt` → host `./root/file.txt`
+- `/project/sub/file.txt` → host `./subdir/file.txt`
+- `/project/other/file.txt` → host `./root/other/file.txt`
+
+<Note>
+Nash uses the longest matching VFS prefix to determine which mount handles a path.
+</Note>
+
+## Summary
+
+| Flag | Purpose | Example |
+|------|---------|--------|
+| `-B host:vfs` | Read-write mount | `-B ./src:/src` |
+| `--bind host:vfs` | Read-write mount (long form) | `--bind ./data:/data` |
+| `--bind-ro host:vfs` | Read-only mount | `--bind-ro ./config:/config` |
+| `-C vfs_path` | Set working directory | `-C /src` |
+
+<Warning>
+**Security reminder:** Only mount directories that you trust Nash to access. Mounted paths give Nash full read (and write, unless read-only) access to those host locations.
+</Warning>

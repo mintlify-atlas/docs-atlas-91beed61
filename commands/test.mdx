@@ -1,0 +1,381 @@
+---
+title: test / [
+description: Evaluate conditional expressions and test file attributes
+---
+
+## Overview
+
+The `test` command (also invoked as `[`) evaluates conditional expressions and returns an exit status of 0 (true) or 1 (false). It's commonly used in conditional statements and scripts to test files, strings, and numeric values.
+
+## Syntax
+
+```bash
+test EXPRESSION
+[ EXPRESSION ]
+```
+
+<Note>
+When using `[`, you must close it with `]` and include spaces around brackets:
+```bash
+[ -f file.txt ]      # Correct
+[-f file.txt]        # Incorrect
+[  -f file.txt  ]    # Correct (extra spaces are fine)
+```
+</Note>
+
+## File Test Operators
+
+<ParamField path="-f FILE" type="test">
+  True if FILE exists and is a regular file (not a directory)
+  ```bash
+  test -f config.json && echo "File exists"
+  ```
+</ParamField>
+
+<ParamField path="-d FILE" type="test">
+  True if FILE exists and is a directory
+  ```bash
+  [ -d /home/user ] && echo "Directory exists"
+  ```
+</ParamField>
+
+<ParamField path="-e FILE" type="test">
+  True if FILE exists (file or directory)
+  ```bash
+  test -e /tmp && echo "Path exists"
+  ```
+</ParamField>
+
+## String Test Operators
+
+<ParamField path="-z STRING" type="test">
+  True if STRING is empty (zero length)
+  ```bash
+  test -z "$VAR" && echo "Variable is empty"
+  ```
+</ParamField>
+
+<ParamField path="-n STRING" type="test">
+  True if STRING is not empty (non-zero length)
+  ```bash
+  [ -n "$VAR" ] && echo "Variable is set"
+  ```
+</ParamField>
+
+<ParamField path="STRING1 = STRING2" type="test">
+  True if strings are equal
+  ```bash
+  test "$USER" = "alice" && echo "Hello Alice"
+  ```
+</ParamField>
+
+<ParamField path="STRING1 == STRING2" type="test">
+  Alternative syntax for string equality (same as `=`)
+  ```bash
+  [ "$SHELL" == "nash" ] && echo "Running Nash"
+  ```
+</ParamField>
+
+<ParamField path="STRING1 != STRING2" type="test">
+  True if strings are not equal
+  ```bash
+  test "$ENV" != "production" && echo "Not production"
+  ```
+</ParamField>
+
+## Numeric Comparison Operators
+
+<ParamField path="NUM1 -eq NUM2" type="test">
+  True if numbers are equal
+  ```bash
+  [ "$COUNT" -eq 10 ] && echo "Count is 10"
+  ```
+</ParamField>
+
+<ParamField path="NUM1 -ne NUM2" type="test">
+  True if numbers are not equal
+  ```bash
+  test "$PORT" -ne 8080 && echo "Using custom port"
+  ```
+</ParamField>
+
+<ParamField path="NUM1 -lt NUM2" type="test">
+  True if NUM1 is less than NUM2
+  ```bash
+  [ "$AGE" -lt 18 ] && echo "Minor"
+  ```
+</ParamField>
+
+<ParamField path="NUM1 -le NUM2" type="test">
+  True if NUM1 is less than or equal to NUM2
+  ```bash
+  test "$SCORE" -le 100 && echo "Valid score"
+  ```
+</ParamField>
+
+<ParamField path="NUM1 -gt NUM2" type="test">
+  True if NUM1 is greater than NUM2
+  ```bash
+  [ "$TEMP" -gt 30 ] && echo "Hot!"
+  ```
+</ParamField>
+
+<ParamField path="NUM1 -ge NUM2" type="test">
+  True if NUM1 is greater than or equal to NUM2
+  ```bash
+  test "$VERSION" -ge 2 && echo "Version 2 or higher"
+  ```
+</ParamField>
+
+## Examples
+
+### File Tests
+
+<CodeGroup>
+```bash Check if file exists
+if test -f config.json; then
+  echo "Config file found"
+else
+  echo "Config file missing"
+fi
+```
+
+```bash Check if directory exists
+[ -d /home/user/projects ] && cd /home/user/projects
+```
+
+```bash Check if path exists
+test -e /tmp/data || mkdir /tmp/data
+```
+</CodeGroup>
+
+### String Tests
+
+<CodeGroup>
+```bash Check if variable is empty
+if [ -z "$INPUT" ]; then
+  echo "No input provided"
+fi
+```
+
+```bash Check if variable is set
+test -n "$API_KEY" || echo "Warning: API_KEY not set"
+```
+
+```bash String comparison
+if [ "$MODE" = "debug" ]; then
+  echo "Debug mode enabled"
+fi
+```
+</CodeGroup>
+
+### Numeric Comparisons
+
+<CodeGroup>
+```bash Compare numbers
+COUNT=5
+if test "$COUNT" -gt 0; then
+  echo "Count is positive"
+fi
+```
+
+```bash Range check
+VALUE=15
+[ "$VALUE" -ge 10 ] && [ "$VALUE" -le 20 ] && echo "In range"
+```
+
+```bash Equality check
+test "$STATUS" -eq 200 && echo "Success"
+```
+</CodeGroup>
+
+## Practical Use Cases
+
+### File Validation
+
+```bash
+# Check if required files exist
+test -f package.json || echo "Error: package.json not found"
+test -d node_modules || echo "Error: dependencies not installed"
+```
+
+### Configuration Validation
+
+```bash
+# Validate environment variables
+if [ -z "$DB_HOST" ]; then
+  echo "Error: DB_HOST not set"
+  exit 1
+fi
+
+if [ -z "$DB_PORT" ]; then
+  echo "Using default port"
+  export DB_PORT=5432
+fi
+```
+
+### Conditional Execution
+
+```bash
+# Run different commands based on environment
+if [ "$ENV" = "production" ]; then
+  echo "Running production build"
+else
+  echo "Running development build"
+fi
+```
+
+### Script Safety Checks
+
+```bash
+# Check prerequisites before running
+test -f .env || echo "Warning: .env file missing"
+test -d logs || mkdir logs
+test -n "$USER" || export USER=default
+```
+
+### Version Checking
+
+```bash
+# Check version compatibility
+VERSION=2
+if [ "$VERSION" -ge 2 ]; then
+  echo "Using new API"
+else
+  echo "Using legacy API"
+fi
+```
+
+### Input Validation
+
+```bash
+# Validate user input
+read INPUT
+
+if [ -z "$INPUT" ]; then
+  echo "Error: Input cannot be empty"
+  exit 1
+fi
+
+if [ "$INPUT" = "quit" ]; then
+  echo "Exiting..."
+  exit 0
+fi
+```
+
+## Combining Tests
+
+Use shell operators to combine multiple tests:
+
+```bash
+# AND: Both conditions must be true
+test -f config.json && test -n "$API_KEY" && echo "Ready"
+
+# OR: Either condition must be true
+test -f config.yaml || test -f config.json || echo "No config found"
+
+# Complex conditions
+if [ -f data.txt ] && [ -n "$PROCESS" ]; then
+  echo "Processing data.txt"
+fi
+```
+
+## Common Patterns
+
+### Set Default Value
+
+```bash
+test -z "$PORT" && export PORT=8080
+echo "Using port: $PORT"
+```
+
+### Create Directory if Missing
+
+```bash
+test -d output || mkdir output
+```
+
+### Check Multiple Files
+
+```bash
+if [ -f index.html ] && [ -f style.css ] && [ -f script.js ]; then
+  echo "All files present"
+else
+  echo "Missing files"
+fi
+```
+
+### Validate Number Range
+
+```bash
+VALUE=50
+if [ "$VALUE" -ge 0 ] && [ "$VALUE" -le 100 ]; then
+  echo "Valid percentage"
+fi
+```
+
+### String Pattern Matching
+
+```bash
+FILENAME="document.txt"
+test "$FILENAME" = "document.txt" && echo "Found document"
+```
+
+## Exit Status
+
+<Tabs>
+  <Tab title="True (0)">
+    When the condition is true:
+    ```bash
+    test -f existing-file.txt
+    echo $?
+    # Output: 0
+    ```
+  </Tab>
+  <Tab title="False (1)">
+    When the condition is false:
+    ```bash
+    test -f non-existent-file.txt
+    echo $?
+    # Output: 1
+    ```
+  </Tab>
+</Tabs>
+
+## Notes
+
+<Note>
+- Always quote variables to handle empty values correctly: `[ -z "$VAR" ]`
+- Use `-eq`, `-ne`, etc. for numeric comparisons, not `=` or `!=`
+- Use `=` or `!=` for string comparisons, not `-eq` or `-ne`
+- Spaces are required around brackets: `[ -f file ]`, not `[-f file]`
+- The closing `]` is required when using `[` syntax
+</Note>
+
+<Warning>
+Common mistakes:
+
+```bash
+# Wrong: no spaces around brackets
+[-f file.txt]
+
+# Wrong: missing closing bracket
+[ -f file.txt
+
+# Wrong: using -eq for strings
+test "$STR" -eq "value"  # Use = instead
+
+# Wrong: using = for numbers
+test "$NUM" = 10  # Use -eq instead
+
+# Wrong: unquoted variable
+test -z $VAR  # Should be "$VAR"
+```
+</Warning>
+
+## Related Commands
+
+- [true](/commands/true-false) - Always returns success (exit code 0)
+- [false](/commands/true-false) - Always returns failure (exit code 1)
+- [which](/commands/which) - Check if command exists
+- [stat](/commands/stat) - Display detailed file information

@@ -1,0 +1,495 @@
+---
+title: head & tail
+description: Display the beginning or end of files
+---
+
+## Syntax
+
+```bash
+head [OPTIONS] [FILE...]
+tail [OPTIONS] [FILE...]
+```
+
+## Description
+
+The `head` and `tail` commands display the first or last portion of text input, respectively. They're essential for previewing file contents, examining log files, and limiting output in pipelines.
+
+Both commands default to showing 10 lines and can read from files or standard input.
+
+Nash implements these commands entirely in-memory within the virtual filesystem.
+
+## head - Display First Lines
+
+### Options
+
+<ParamField path="-n N" type="number" default="10">
+  Show the first N lines of input.
+  
+  Can also be written as `-nN` (without space): `-n5` or `-n 5`
+</ParamField>
+
+### Examples
+
+#### Default (10 lines)
+
+```bash
+echo -e "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12" | head
+```
+
+<CodeGroup>
+```bash Output
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+```
+</CodeGroup>
+
+#### Custom line count
+
+```bash
+echo -e "apple\nbanana\ncherry\ndate" | head -n 2
+```
+
+<CodeGroup>
+```bash Output
+apple
+banana
+```
+</CodeGroup>
+
+#### Compact syntax
+
+```bash
+echo -e "a\nb\nc\nd\ne" | head -n3
+```
+
+<CodeGroup>
+```bash Output
+a
+b
+c
+```
+</CodeGroup>
+
+#### From file
+
+```bash
+echo -e "line 1\nline 2\nline 3\nline 4\nline 5" > test.txt
+head -n 2 test.txt
+```
+
+<CodeGroup>
+```bash Output
+line 1
+line 2
+```
+</CodeGroup>
+
+## tail - Display Last Lines
+
+### Options
+
+<ParamField path="-n N" type="number" default="10">
+  Show the last N lines of input.
+  
+  Can also be written as `-nN` (without space): `-n5` or `-n 5`
+</ParamField>
+
+### Examples
+
+#### Default (10 lines)
+
+```bash
+echo -e "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12" | tail
+```
+
+<CodeGroup>
+```bash Output
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+```
+</CodeGroup>
+
+#### Custom line count
+
+```bash
+echo -e "apple\nbanana\ncherry\ndate" | tail -n 2
+```
+
+<CodeGroup>
+```bash Output
+cherry
+date
+```
+</CodeGroup>
+
+#### Compact syntax
+
+```bash
+echo -e "a\nb\nc\nd\ne" | tail -n3
+```
+
+<CodeGroup>
+```bash Output
+c
+d
+e
+```
+</CodeGroup>
+
+#### From file
+
+```bash
+echo -e "line 1\nline 2\nline 3\nline 4\nline 5" > test.txt
+tail -n 2 test.txt
+```
+
+<CodeGroup>
+```bash Output
+line 4
+line 5
+```
+</CodeGroup>
+
+## Pipeline Examples
+
+### Preview long output
+
+```bash
+ls -la | head -n 5
+```
+
+Shows first 5 entries.
+
+### Check recent log entries
+
+```bash
+cat app.log | tail -n 20
+```
+
+Shows last 20 log lines.
+
+### Top N after sorting
+
+```bash
+cat scores.txt | sort -rn | head -n 3
+```
+
+Shows top 3 scores.
+
+### Bottom N after sorting
+
+```bash
+cat scores.txt | sort -n | head -n 3
+```
+
+Shows bottom 3 scores (or use `tail -n 3` with reverse sort).
+
+### Sample data
+
+```bash
+cat large-dataset.csv | head -n 100 > sample.csv
+```
+
+Creates a 100-row sample.
+
+### Preview and analyze
+
+```bash
+cat data.csv | head -n 1
+```
+
+Shows CSV headers.
+
+### Skip header and show data
+
+```bash
+cat data.csv | tail -n +2 | head -n 5
+```
+
+Note: Nash's tail doesn't support `+N` syntax; use other commands to skip lines.
+
+### Middle section
+
+```bash
+cat file.txt | head -n 20 | tail -n 10
+```
+
+Shows lines 11-20.
+
+## Practical Use Cases
+
+### Check file structure
+
+```bash
+head -n 1 data.csv
+```
+
+Preview CSV column headers.
+
+### Recent errors
+
+```bash
+grep ERROR app.log | tail -n 10
+```
+
+Last 10 error messages.
+
+### Validate output
+
+```bash
+command-with-lots-of-output | head -n 5
+```
+
+Quick sanity check of output format.
+
+### Create test subset
+
+```bash
+head -n 1000 large-file.txt > test-data.txt
+```
+
+### Monitor log files
+
+```bash
+tail -n 50 access.log
+```
+
+View recent access log entries.
+
+### Compare beginnings
+
+```bash
+echo "File 1:"
+head -n 3 file1.txt
+echo "\nFile 2:"
+head -n 3 file2.txt
+```
+
+### Find patterns in sections
+
+```bash
+head -n 1000 data.txt | grep pattern | wc -l
+```
+
+Count pattern matches in first 1000 lines.
+
+### Top performers
+
+```bash
+cat results.txt | sort -rn | head -n 10
+```
+
+Top 10 results (highest values).
+
+## Advanced Examples
+
+### Extract header and footer
+
+```bash
+echo "=== Header ==="
+head -n 3 document.txt
+echo "\n=== Footer ==="
+tail -n 3 document.txt
+```
+
+### Sliding window
+
+```bash
+# Lines 21-30
+cat file.txt | head -n 30 | tail -n 10
+```
+
+### Percentage sample
+
+```bash
+TOTAL=$(cat data.txt | wc -l)
+SAMPLE=$((TOTAL / 10))
+head -n $SAMPLE data.txt
+```
+
+Takes top 10% of lines.
+
+### Last N errors
+
+```bash
+grep -i error logs.txt | tail -n 5
+```
+
+### First occurrence
+
+```bash
+grep pattern file.txt | head -n 1
+```
+
+Finds first matching line.
+
+### Multiple files
+
+```bash
+head -n 5 file1.txt file2.txt file3.txt
+```
+
+Shows first 5 lines of each file.
+
+## Combining head and tail
+
+<Tabs>
+  <Tab title="First N">
+    ```bash
+    cat numbers.txt | head -n 3
+    ```
+    
+    Shows first 3 lines.
+  </Tab>
+  
+  <Tab title="Last N">
+    ```bash
+    cat numbers.txt | tail -n 3
+    ```
+    
+    Shows last 3 lines.
+  </Tab>
+  
+  <Tab title="Middle section">
+    ```bash
+    cat numbers.txt | head -n 20 | tail -n 10
+    ```
+    
+    Shows lines 11-20.
+  </Tab>
+  
+  <Tab title="All but first N">
+    ```bash
+    cat numbers.txt | tail -n +4
+    ```
+    
+    Note: Nash's tail doesn't support `+N` syntax.
+  </Tab>
+</Tabs>
+
+## Tips
+
+### Default behavior
+
+Both commands default to 10 lines:
+
+```bash
+head file.txt    # First 10 lines
+tail file.txt    # Last 10 lines
+```
+
+### Syntax flexibility
+
+These are equivalent:
+
+```bash
+head -n 5 file.txt
+head -n5 file.txt
+```
+
+### File vs stdin
+
+Both work with files or pipes:
+
+```bash
+head -n 3 data.txt           # From file
+cat data.txt | head -n 3     # From stdin
+```
+
+### Combining with grep
+
+Filter then limit:
+
+```bash
+grep pattern file.txt | head -n 10
+```
+
+### Empty input
+
+Both commands handle empty input gracefully:
+
+```bash
+echo -n "" | head    # No output
+echo -n "" | tail    # No output
+```
+
+### Line counting edge cases
+
+If input has fewer lines than requested:
+
+```bash
+echo -e "a\nb" | head -n 10   # Shows 2 lines (all available)
+echo -e "a\nb" | tail -n 10   # Shows 2 lines (all available)
+```
+
+## Common Patterns
+
+### Quick preview
+
+```bash
+head file.txt
+```
+
+See what's in a file without opening it fully.
+
+### Recent activity
+
+```bash
+tail logs/app.log
+```
+
+Check latest log entries.
+
+### Top N results
+
+```bash
+sort -rn scores.txt | head -n 5
+```
+
+Leaderboard: top 5 scores.
+
+### Sample extraction
+
+```bash
+head -n 100 large-file.txt > sample.txt
+```
+
+Create small test file from large dataset.
+
+### Skip and process
+
+```bash
+tail -n +2 data.csv | head -n 10
+```
+
+Note: Nash's tail doesn't support `+N` syntax; use alternatives.
+
+## Performance
+
+<Note>
+**Memory efficiency**: Nash's `head` can stop reading once it has N lines, but `tail` must read all input to find the last N lines. For very long input, `tail` will use more memory than `head`.
+</Note>
+
+## Related Commands
+
+- [`cat`](/commands/cat) - Display entire files
+- [`wc`](/commands/wc) - Count lines
+- [`grep`](/commands/grep) - Filter lines
+- [`sort`](/commands/sort) - Order lines before head/tail
+- [`sed`](/commands/sed) - Extract specific line numbers

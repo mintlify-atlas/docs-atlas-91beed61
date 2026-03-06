@@ -1,0 +1,341 @@
+---
+title: jq
+description: Process JSON data with powerful query filters
+---
+
+## Overview
+
+The `jq` command is a lightweight JSON processor built into Nash. It allows you to parse, filter, and transform JSON data using a query syntax inspired by the popular jq tool.
+
+## Syntax
+
+```bash
+jq [OPTIONS] FILTER [FILE...]
+```
+
+## Options
+
+<ParamField path="-c" type="flag">
+  Compact output. Produces single-line JSON without pretty formatting.
+</ParamField>
+
+<ParamField path="-r" type="flag">
+  Raw output. Outputs strings without JSON quotes (useful for extracting plain text values).
+</ParamField>
+
+<ParamField path="-n" type="flag">
+  Null input. Starts with `null` as input instead of reading from stdin or files.
+</ParamField>
+
+## Supported Filters
+
+### Identity Filter
+
+<CodeGroup>
+```bash Basic usage
+echo '{"name":"Nash"}' | jq .
+# Output:
+# {
+#   "name": "Nash"
+# }
+```
+
+```bash Compact output
+echo '{"name":"Nash"}' | jq -c .
+# Output: {"name":"Nash"}
+```
+</CodeGroup>
+
+### Object Key Access
+
+Access object properties using `.key` syntax:
+
+```bash
+echo '{"name":"Nash","version":"1.0"}' | jq .name
+# Output: "Nash"
+```
+
+### Chained Key Access
+
+Access nested properties with dot notation:
+
+```bash
+echo '{"user":{"name":"Alice","age":30}}' | jq .user.name
+# Output: "Alice"
+```
+
+### Array Index Access
+
+Access array elements by index using `.[N]`:
+
+```bash
+echo '["apple","banana","cherry"]' | jq .[1]
+# Output: "banana"
+```
+
+### Bracket Key Access
+
+Access object keys using bracket notation `.["key"]`:
+
+```bash
+echo '{"my-key":"value"}' | jq .["my-key"]
+# Output: "value"
+```
+
+### Array/Object Iteration
+
+Iterate over all elements using `.[]`:
+
+```bash
+echo '[1,2,3]' | jq .[]
+# Output:
+# [
+#   1,
+#   2,
+#   3
+# ]
+```
+
+```bash
+echo '{"a":1,"b":2}' | jq .[]
+# Output:
+# [
+#   1,
+#   2
+# ]
+```
+
+### Built-in Functions
+
+#### keys
+
+Get all keys from an object or indices from an array:
+
+```bash
+echo '{"name":"Nash","type":"shell"}' | jq keys
+# Output:
+# [
+#   "name",
+#   "type"
+# ]
+```
+
+```bash
+echo '["a","b","c"]' | jq keys
+# Output:
+# [
+#   0,
+#   1,
+#   2
+# ]
+```
+
+#### values
+
+Get all values from an object or array:
+
+```bash
+echo '{"name":"Nash","version":"1.0"}' | jq values
+# Output:
+# [
+#   "Nash",
+#   "1.0"
+# ]
+```
+
+#### length
+
+Get the length of arrays, objects, or strings:
+
+```bash
+echo '[1,2,3,4,5]' | jq length
+# Output: 5
+```
+
+```bash
+echo '{"a":1,"b":2}' | jq length
+# Output: 2
+```
+
+```bash
+echo '"hello"' | jq length
+# Output: 5
+```
+
+#### type
+
+Get the JSON type of a value:
+
+```bash
+echo '"hello"' | jq type
+# Output: "string"
+```
+
+```bash
+echo '42' | jq type
+# Output: "number"
+```
+
+```bash
+echo '[1,2,3]' | jq type
+# Output: "array"
+```
+
+```bash
+echo '{"key":"value"}' | jq type
+# Output: "object"
+```
+
+```bash
+echo 'null' | jq type
+# Output: "null"
+```
+
+```bash
+echo 'true' | jq type
+# Output: "boolean"
+```
+
+#### has(key)
+
+Check if an object has a specific key:
+
+```bash
+echo '{"name":"Nash"}' | jq 'has("name")'
+# Output: true
+```
+
+```bash
+echo '{"name":"Nash"}' | jq 'has("version")'
+# Output: false
+```
+
+## Examples
+
+### Extract Specific Field
+
+```bash
+echo '{"user":"alice","score":95}' | jq .score
+# Output: 95
+```
+
+### Raw String Output
+
+```bash
+echo '{"message":"Hello, World!"}' | jq -r .message
+# Output: Hello, World!
+# (no quotes)
+```
+
+### Process JSON File
+
+```bash
+jq .results data.json
+```
+
+### Compact JSON
+
+```bash
+cat config.json | jq -c .
+# Output: {"name":"Nash","version":"1.0"}
+```
+
+### Extract from Nested Structure
+
+```bash
+echo '{"response":{"data":{"items":[1,2,3]}}}' | jq .response.data.items
+# Output:
+# [
+#   1,
+#   2,
+#   3
+# ]
+```
+
+### Get Array Length
+
+```bash
+echo '{"users":["alice","bob","charlie"]}' | jq '.users | length'
+# Note: Nash jq doesn't support pipe syntax yet, use:
+echo '["alice","bob","charlie"]' | jq length
+# Output: 3
+```
+
+### List All Keys
+
+```bash
+cat package.json | jq keys
+```
+
+### Check Key Existence
+
+```bash
+echo '{"status":"ok"}' | jq 'has("status")'
+# Output: true
+```
+
+## Practical Use Cases
+
+### API Response Processing
+
+```bash
+# Extract error message from API response
+echo '{"error":{"message":"Not found"}}' | jq -r .error.message
+```
+
+### Configuration Validation
+
+```bash
+# Check if required config keys exist
+test $(cat config.json | jq 'has("api_key")') = "true" && echo "Valid"
+```
+
+### Data Inspection
+
+```bash
+# Quickly view JSON structure
+cat large-file.json | jq keys
+```
+
+### Extract Values for Scripts
+
+```bash
+# Get version for deployment script
+VERSION=$(cat package.json | jq -r .version)
+echo "Deploying version $VERSION"
+```
+
+## Error Handling
+
+<Warning>
+The `jq` command will return an error if:
+- The input is not valid JSON
+- The filter references a non-existent key (returns `null`)
+- A filter is applied to an incompatible type (e.g., `.key` on an array)
+</Warning>
+
+```bash
+# Invalid JSON
+echo 'not json' | jq .
+# Error: jq: invalid JSON: ...
+
+# Filter on wrong type
+echo '[1,2,3]' | jq .key
+# Error: jq: .key on non-object
+```
+
+## Notes
+
+<Note>
+- Missing keys return `null` rather than producing an error
+- The `-r` flag is particularly useful when extracting string values for shell variables
+- Null input mode (`-n`) is useful for generating JSON from scratch
+- Array indices are 0-based
+</Note>
+
+## Related Commands
+
+- [grep](/commands/grep) - Filter text by pattern
+- [cut](/commands/cut) - Extract fields from text
+- [sed](/commands/sed) - Stream editor for text transformation
+- [cat](/commands/cat) - Display file contents

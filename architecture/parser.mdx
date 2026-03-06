@@ -1,0 +1,422 @@
+---
+title: Parser Architecture
+description: Tokenization, AST construction, and parsing implementation
+---
+
+The parser module converts raw shell input strings into an Abstract Syntax Tree (AST) that the runtime can execute. It's a **hand-written recursive-descent parser** with no external parser dependencies.
+
+## Module Structure
+
+The parser is split into three files:
+
+```
+parser/
+├── mod.rs      # Parser entrypoint, recursive-descent implementation
+├── ast.rs      # AST type definitions (Expr, Word, WordPart, RedirectMode)
+└── lexer.rs    # Tokenizer (string → token stream)
+```
+
+<Note>
+The parser and runtime are completely decoupled. The parser produces an `Expr` tree and knows nothing about execution semantics.
+</Note>
+
+## Parsing Pipeline
+
+Parsing happens in two phases:
+
+```
+┌──────────────────┐
+│  Raw Input       │  "echo hello | grep world"
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Lexer           │  Tokenize into symbols
+│  (lexer.rs)      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Token Stream    │  [Word("echo"), Word("hello"), Pipe, Word("grep"), Word("world"), Eof]
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Parser          │  Build AST tree
+│  (mod.rs)        │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  AST             │  Expr::Pipe {
+│  (Expr tree)     │    left: Expr::Command { name: "echo", args: ["hello"] },
+└──────────────────┘    right: Expr::Command { name: "grep", args: ["world"] }
+                      }
+```
+
+## Lexer (lexer.rs)
+
+The lexer converts a raw string into a flat token stream. It handles:
+
+- Whitespace skipping
+- Quote parsing (single and double)
+- Escape sequences (`\n`, `\t`, etc.)
+- Variable expansion (`$VAR`, `${VAR}`)
+- Command substitution (`$(command)`)
+- Operator recognition (`|`, `&&`, `||`, `;`, `>`, `>>`)
+
+### Token Types
+
+From src/parser/lexer.rs:10-34:
+
+```rust
+pub enum Token {
+    Word(Word),           // A (possibly compound) word
+    Pipe,                 // |
+    And,                  // &&
+    Or,                   // ||
+    Semi,                 // ;
+    LParen,               // (
+    RParen,               // )
+    RedirectOut,          // >
+    RedirectAppend,       // >>
+    RedirectIn,           // <
+    Eof,                  // End of input
+}
+```
+
+### Tokenization Process
+
+The lexer reads character by character, building `Word` tokens that may contain multiple parts:
+
+```rust
+// From src/parser/lexer.rs:46-119
+pub fn tokenize(mut self) -> Result<Vec<Token>, ParseError> {
+    let mut tokens = Vec::new();
+    loop {
+        self.skip_whitespace();
+        if self.pos >= self.src.len() {
+            tokens.push(Token::Eof);
+            break;
+        }
+        
+        let ch = self.current_char();
+        
+        // Handle operators
+        let tok = match ch {
+            '|' => { /* ... pipe or || ... */ }
+            '&' => { /* ... && ... */ }
+            ';' => Token::Semi,
+            '>' => { /* ... > or >> ... */ }
+            '<' => Token::RedirectIn,
+            _ => {
+                let word = self.read_word()?;  // Read compound word
+                Token::Word(word)
+            }
+        };
+        
+        tokens.push(tok);
+    }
+    Ok(tokens)
+}
+```
+
+### Quote Handling
+
+Quotes are handled during word reading (src/parser/lexer.rs:156-227):
+
+<Accordion title="Single Quotes (no expansion)">
+```rust
+'\'' => {
+    self.advance(); // opening '
+    while self.pos < self.src.len() && self.current_char() != '\'' {
+        literal_buf.push(self.current_char());
+        self.advance();
+    }
+    if self.pos >= self.src.len() {
+        return Err(ParseError::Unmatched('\''));
+    }
+    self.advance(); // closing '
+}
+```
+
+Single quotes disable all expansions: `'$HOME'` → literal `$HOME`
+</Accordion>
+
+<Accordion title="Double Quotes (expansion active)">
+```rust
+'"' => {
+    self.advance(); // opening "
+    while self.pos < self.src.len() && self.current_char() != '"' {
+        if self.current_char() == '$' {
+            // Variable or command substitution
+            if !literal_buf.is_empty() {
+                parts.push(WordPart::Literal(std::mem::take(&mut literal_buf)));
+            }
+            let part = self.read_dollar()?;
+            parts.push(part);
+        } else {
+            literal_buf.push(self.current_char());
+            self.advance();
+        }
+    }
+    self.advance(); // closing "
+}
+```
+
+Double quotes allow `$VAR` and `$(cmd)` expansion: `"Hello $USER"` → `Hello alice`
+</Accordion>
+
+### Variable Expansion
+
+The lexer recognizes three forms (src/parser/lexer.rs:229-261):
+
+```rust
+fn read_dollar(&mut self) -> Result<WordPart, ParseError> {
+    self.advance(); // consume '$'
+    
+    match self.current_char() {
+        '(' => {
+            // Command substitution: $(cmd)
+            self.advance();
+            let sub_src = self.read_until_close_paren()?;
+            let expr = super::parse(&sub_src)?;  // Recursive parse!
+            Ok(WordPart::CommandSubst(Box::new(expr)))
+        }
+        '{' => {
+            // Braced variable: ${VAR}
+            self.advance();
+            let name = self.read_identifier();
+            if self.current_char() == '}' { self.advance(); }
+            Ok(WordPart::Variable(name))
+        }
+        c if c.is_alphabetic() || c == '_' => {
+            // Simple variable: $VAR
+            let name = self.read_identifier();
+            Ok(WordPart::Variable(name))
+        }
+        _ => Ok(WordPart::Literal("$".to_string())),
+    }
+}
+```
+
+## AST Types (ast.rs)
+
+The AST represents the parsed shell command structure.
+
+### Expr — Top-Level Expression
+
+From src/parser/ast.rs:30-57:
+
+```rust
+pub enum Expr {
+    /// Simple command with arguments
+    Command { name: Word, args: Vec<Word> },
+    
+    /// Pipe: left | right
+    Pipe { left: Box<Expr>, right: Box<Expr> },
+    
+    /// Redirect: cmd > file, cmd < file, cmd >> file
+    Redirect { expr: Box<Expr>, file: Word, mode: RedirectMode },
+    
+    /// Sequence: left ; right (always run both)
+    Sequence { left: Box<Expr>, right: Box<Expr> },
+    
+    /// And: left && right (run right only if left succeeds)
+    And { left: Box<Expr>, right: Box<Expr> },
+    
+    /// Or: left || right (run right only if left fails)
+    Or { left: Box<Expr>, right: Box<Expr> },
+    
+    /// Subshell: ( expr )
+    Subshell { expr: Box<Expr> },
+}
+```
+
+### Word — Compound Word
+
+A word may contain multiple parts that need expansion (src/parser/ast.rs:3-17):
+
+```rust
+pub struct Word(pub Vec<WordPart>);
+
+pub enum WordPart {
+    Literal(String),            // Plain text or quoted string
+    Variable(String),           // $VAR or ${VAR}
+    CommandSubst(Box<Expr>),    // $(command)
+}
+```
+
+**Example:** `"Hello $USER"` becomes:
+
+```rust
+Word(vec![
+    WordPart::Literal("Hello ".to_string()),
+    WordPart::Variable("USER".to_string()),
+])
+```
+
+### RedirectMode
+
+From src/parser/ast.rs:19-28:
+
+```rust
+pub enum RedirectMode {
+    Overwrite,  // >  — truncate/create and write
+    Append,     // >> — append to file
+    Input,      // <  — read from file
+}
+```
+
+## Parser (mod.rs)
+
+The parser uses **recursive descent** to build the AST from tokens.
+
+### Parse Entry Point
+
+From src/parser/mod.rs:30-39:
+
+```rust
+pub fn parse(input: &str) -> ParseResult<Expr> {
+    let tokens = Lexer::new(input).tokenize()?;
+    let mut parser = Parser::new(tokens);
+    let expr = parser.parse_list()?;
+    if !parser.is_done() {
+        return Err(ParseError::UnexpectedToken(parser.peek().clone()));
+    }
+    Ok(expr)
+}
+```
+
+### Grammar Structure
+
+The parser implements this grammar hierarchy (src/parser/mod.rs:75-229):
+
+```
+list      = pipeline ( ('&&'|'||'|';') pipeline )*
+pipeline  = redirect ('|' redirect)*
+redirect  = command (redirection)*
+command   = subshell | simple_command
+subshell  = '(' list ')'
+simple_command = word+
+```
+
+### Operator Precedence
+
+From highest to lowest:
+
+1. **Words** — `echo hello`
+2. **Redirects** — `> file`, `< input`
+3. **Pipes** — `|`
+4. **Sequences** — `;`
+5. **Conditionals** — `&&`, `||`
+
+<Accordion title="Example: Parse 'echo hello | grep h && wc -l'">
+```
+Tokens: [Word("echo"), Word("hello"), Pipe, Word("grep"), Word("h"), And, Word("wc"), Word("-l"), Eof]
+
+Parse tree:
+
+Expr::And {
+  left: Expr::Pipe {
+    left: Expr::Command { name: "echo", args: ["hello"] },
+    right: Expr::Command { name: "grep", args: ["h"] }
+  },
+  right: Expr::Command { name: "wc", args: ["-l"] }
+}
+```
+
+The parser correctly groups the pipe before the `&&`.
+</Accordion>
+
+## Example Parsing Flow
+
+Let's trace parsing `echo $USER > /tmp/out.txt`:
+
+```rust
+// 1. Lexer tokenizes input
+Tokens: [
+  Word([Literal("echo")]),
+  Word([Variable("USER")]),
+  RedirectOut,
+  Word([Literal("/tmp/out.txt")]),
+  Eof
+]
+
+// 2. Parser builds AST
+Expr::Redirect {
+  expr: Box::new(Expr::Command {
+    name: Word([Literal("echo")]),
+    args: vec![Word([Variable("USER")])]
+  }),
+  file: Word([Literal("/tmp/out.txt")]),
+  mode: RedirectMode::Overwrite
+}
+```
+
+## Testing
+
+The parser module includes extensive tests (src/parser/mod.rs:232-431):
+
+```rust
+#[test]
+fn test_pipe() {
+    let expr = parse("cat file.txt | grep foo").unwrap();
+    assert_eq!(
+        expr,
+        Expr::Pipe {
+            left: Box::new(cmd("cat", &["file.txt"])),
+            right: Box::new(cmd("grep", &["foo"])),
+        }
+    );
+}
+
+#[test]
+fn test_variable_expansion() {
+    let expr = parse("echo $HOME").unwrap();
+    assert_eq!(
+        expr,
+        Expr::Command {
+            name: Word(vec![WordPart::Literal("echo".to_string())]),
+            args: vec![Word(vec![WordPart::Variable("HOME".to_string())])],
+        }
+    );
+}
+```
+
+## Key Design Decisions
+
+### 1. Two-Phase Parsing
+
+Separating lexing from parsing simplifies both:
+
+- Lexer handles quotes, escapes, and low-level string manipulation
+- Parser focuses on grammar and tree construction
+
+### 2. Hand-Written Parser
+
+No parser generator dependencies:
+
+- Full control over error messages
+- Easy to debug and extend
+- No macro magic or generated code
+
+### 3. Compound Words
+
+Words are `Vec<WordPart>` to support mixed literal and expansion:
+
+```rust
+// "Hello $USER!" becomes:
+Word([
+  Literal("Hello "),
+  Variable("USER"),
+  Literal("!")
+])
+```
+
+The runtime expands each part and concatenates the result.
+
+## Next Steps
+
+- [Runtime Architecture](/architecture/runtime) — How the AST is executed
+- [VFS Architecture](/architecture/vfs) — File operations during parsing

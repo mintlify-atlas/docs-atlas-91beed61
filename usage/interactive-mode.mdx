@@ -1,0 +1,271 @@
+---
+title: Interactive Mode
+description: Using Nash's interactive REPL for hands-on shell exploration
+---
+
+## Starting the REPL
+
+Launch Nash in interactive mode by running it without arguments:
+
+```bash
+nash
+```
+
+You'll see the welcome banner with your username:
+
+```
+Nash — Not A Shell  │  logged in as user  │  type help or Ctrl-D to exit
+
+user@nash:/home/user$
+```
+
+### Setting a Custom Username
+
+Use the `-U` or `--user` flag to set the session username. This creates a matching home directory and sets all Unix environment variables accordingly:
+
+```bash
+nash -U alice
+```
+
+Output:
+
+```
+Nash — Not A Shell  │  logged in as alice  │  type help or Ctrl-D to exit
+
+alice@nash:/home/alice$
+```
+
+<Note>
+The username affects `$USER`, `$LOGNAME`, `$HOME`, and creates `/home/<username>` with `Desktop/`, `Documents/`, and `Downloads/` subdirectories in the VFS.
+</Note>
+
+## Prompt Structure
+
+The Nash prompt follows the classic bash format:
+
+```
+<username>@nash:<cwd><sigil>
+```
+
+- **username**: The session username (set via `-U`, default: `user`)
+- **cwd**: Current working directory (absolute VFS path)
+- **sigil**: `$` for regular users, `#` for root
+
+<Tabs>
+  <Tab title="Regular User">
+    ```bash
+    user@nash:/home/user$ pwd
+    /home/user
+    user@nash:/home/user$ cd /tmp
+    user@nash:/tmp$
+    ```
+  </Tab>
+  <Tab title="Root User">
+    ```bash
+    root@nash:/root# pwd
+    /root
+    root@nash:/root# cd /etc
+    root@nash:/etc#
+    ```
+  </Tab>
+</Tabs>
+
+## Command History
+
+Nash uses `rustyline` for full readline support with command history:
+
+### Navigation
+
+- **↑/↓ arrows**: Navigate through previous commands
+- **Ctrl+R**: Reverse search through history
+- **Tab**: Filename completion (if available)
+
+### Viewing History
+
+Use the `history` builtin to view all executed commands:
+
+```bash
+user@nash:/home/user$ echo hello
+hello
+user@nash:/home/user$ pwd
+/home/user
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  welcome.txt
+user@nash:/home/user$ history
+echo hello
+pwd
+ls
+history
+```
+
+Limit output to the last N commands:
+
+```bash
+user@nash:/home/user$ history 2
+ls
+history 2
+```
+
+<Note>
+History is stored in memory and persists throughout the session. It resets when you exit Nash.
+</Note>
+
+## Keyboard Shortcuts
+
+### Ctrl-C: Interrupt
+
+Press `Ctrl+C` to cancel the current input line without executing it:
+
+```bash
+user@nash:/home/user$ echo this will not run^C
+user@nash:/home/user$
+```
+
+The `^C` is printed and you get a fresh prompt.
+
+### Ctrl-D: Exit
+
+Press `Ctrl+D` on an empty line to gracefully exit the REPL:
+
+```bash
+user@nash:/home/user$ 
+logout
+```
+
+This is equivalent to typing `exit` or `quit`.
+
+### Exiting the Shell
+
+All three methods exit cleanly:
+
+<CodeGroup>
+```bash exit command
+user@nash:/home/user$ exit
+logout
+```
+
+```bash quit command
+user@nash:/home/user$ quit
+logout
+```
+
+```bash Ctrl-D
+user@nash:/home/user$ [Ctrl+D]
+logout
+```
+</CodeGroup>
+
+## Interactive Flags
+
+### Force Interactive Mode
+
+Use `-i` to force interactive mode even when stdin is not a TTY:
+
+```bash
+nash -i
+```
+
+This is useful when piping to Nash but still wanting the REPL:
+
+```bash
+echo "pwd" | nash -i
+```
+
+### Starting in a Specific Directory
+
+Use `-C` or `--cwd` to override the initial directory:
+
+```bash
+nash -C /tmp
+```
+
+Prompt output:
+
+```
+Nash — Not A Shell  │  logged in as user  │  type help or Ctrl-D to exit
+
+user@nash:/tmp$
+```
+
+### Combining Flags
+
+<CodeGroup>
+```bash Custom user + directory
+nash -U alice -C /var/log
+```
+
+```bash Interactive + xtrace
+nash -i -x
+```
+
+```bash All together
+nash -U bob -C /tmp -x -e
+```
+</CodeGroup>
+
+## Real-World Examples
+
+### Basic Session
+
+```bash
+$ nash
+Nash — Not A Shell  │  logged in as user  │  type help or Ctrl-D to exit
+
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  welcome.txt
+user@nash:/home/user$ cat welcome.txt
+Welcome to Nash!
+Type 'help' to see available commands.
+user@nash:/home/user$ mkdir projects
+user@nash:/home/user$ cd projects
+user@nash:/home/user/projects$ pwd
+/home/user/projects
+user@nash:/home/user/projects$ exit
+logout
+```
+
+### Using Pipes and Redirections
+
+```bash
+user@nash:/home/user$ echo "apple\nbanana\napple\ncherry" > fruits.txt
+user@nash:/home/user$ cat fruits.txt | sort | uniq
+apple
+banana
+cherry
+user@nash:/home/user$ grep "apple" fruits.txt | wc -l
+2
+```
+
+### Multi-User Development
+
+```bash
+$ nash -U developer -C /home/developer
+Nash — Not A Shell  │  logged in as developer  │  type help or Ctrl-D to exit
+
+developer@nash:/home/developer$ env | grep USER
+USER=developer
+LOGNAME=developer
+developer@nash:/home/developer$ echo $HOME
+/home/developer
+```
+
+## Interactive Detection
+
+Nash automatically detects whether stdin is a TTY. The execution mode follows this priority:
+
+1. `-c CMD` → one-shot command
+2. `-s` → read from stdin
+3. `SCRIPT` → run script file
+4. `-i` → forced interactive
+5. **stdin is TTY** → interactive REPL (default)
+6. stdin is pipe → read from stdin
+
+<Warning>
+When Nash detects non-interactive input (pipe or redirect), it skips the welcome banner and prompt, reading commands line-by-line until EOF.
+</Warning>
+
+## See Also
+
+- [Script Execution](/usage/script-execution) - Running Nash scripts
+- [CLI Flags](/usage/cli-flags) - Complete flag reference
+- [RC Files](/usage/rc-files) - Customizing your Nash environment

@@ -1,80 +1,507 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: A hands-on tutorial to get you started with Nash in minutes.
 ---
 
-## Get started in three steps
+This tutorial will walk you through Nash's core features with practical examples. You'll learn how to use the interactive REPL, run commands, work with files, and leverage Nash's security features.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Make sure you have [installed Nash](/installation) before proceeding.
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Start the Interactive REPL
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Launch Nash">
+    Open your terminal and start Nash in interactive mode:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    nash
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    You'll see the welcome banner:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```
+    Nash — Not A Shell  │  logged in as user  │  type help or Ctrl-D to exit
 
-### Step 3: Go live
+    user@nash:/home/user$
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Tip>
+      The prompt shows your username, hostname (nash), and current directory. It looks like a real shell!
+    </Tip>
+  </Step>
 
-## Next steps
+  <Step title="Explore your environment">
+    Check where you are and what's available:
 
-Now that you have your docs running, explore these key features:
+    ```bash
+    user@nash:/home/user$ pwd
+    /home/user
+
+    user@nash:/home/user$ ls
+    Desktop/  Documents/  Downloads/  welcome.txt
+
+    user@nash:/home/user$ ls -la
+    total 4
+drwxr-xr-x  Desktop/
+drwxr-xr-x  Documents/
+drwxr-xr-x  Downloads/
+-rw-r--r--  welcome.txt
+    ```
+
+    Everything you see exists only in memory — your real home directory is untouched.
+  </Step>
+
+  <Step title="View available commands">
+    Nash includes 28 built-in commands. Get help:
+
+    ```bash
+    user@nash:/home/user$ help
+    ```
+
+    Or check if a specific command exists:
+
+    ```bash
+    user@nash:/home/user$ which grep
+    grep: nash builtin
+
+    user@nash:/home/user$ which bash
+    bash: not found
+    ```
+
+    <Note>
+      Nash only has built-in commands. It cannot execute system binaries like `/bin/bash` or `/usr/bin/python`.
+    </Note>
+  </Step>
+</Steps>
+
+## Working with Files and Directories
+
+<Steps>
+  <Step title="Create a project directory">
+    Let's create a workspace:
+
+    ```bash
+    user@nash:/home/user$ mkdir -p projects/demo
+    user@nash:/home/user$ cd projects/demo
+    user@nash:/home/user/projects/demo$ pwd
+    /home/user/projects/demo
+    ```
+
+    The `-p` flag creates parent directories automatically, just like regular `mkdir`.
+  </Step>
+
+  <Step title="Create and edit files">
+    Write some content to files:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ echo "Hello from Nash!" > greeting.txt
+    user@nash:/home/user/projects/demo$ cat greeting.txt
+    Hello from Nash!
+
+    user@nash:/home/user/projects/demo$ echo "Second line" >> greeting.txt
+    user@nash:/home/user/projects/demo$ cat greeting.txt
+    Hello from Nash!
+    Second line
+    ```
+
+    - `>` overwrites the file
+    - `>>` appends to the file
+  </Step>
+
+  <Step title="Copy and move files">
+    Organize your files:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ cp greeting.txt backup.txt
+    user@nash:/home/user/projects/demo$ ls
+    backup.txt  greeting.txt
+
+    user@nash:/home/user/projects/demo$ mkdir archive
+    user@nash:/home/user/projects/demo$ mv backup.txt archive/
+    user@nash:/home/user/projects/demo$ tree
+    .
+    ├── archive/
+    │   └── backup.txt
+    └── greeting.txt
+    ```
+  </Step>
+</Steps>
+
+## Using Pipes and Text Processing
+
+<Steps>
+  <Step title="Create sample data">
+    Generate some test data:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ cat > fruits.txt
+    apple
+    banana
+    apple
+    cherry
+    banana
+    date
+    apple
+    ^D
+    ```
+
+    <Tip>
+      Press `Ctrl-D` to finish input when using `cat` without a filename.
+    </Tip>
+  </Step>
+
+  <Step title="Filter with grep">
+    Search for patterns:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ grep apple fruits.txt
+    apple
+    apple
+    apple
+
+    user@nash:/home/user/projects/demo$ grep -v apple fruits.txt
+    banana
+    cherry
+    banana
+    date
+    ```
+
+    The `-v` flag inverts the match (show non-matching lines).
+  </Step>
+
+  <Step title="Sort and count unique items">
+    Process data with pipes:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ cat fruits.txt | sort | uniq
+    apple
+    banana
+    cherry
+    date
+
+    user@nash:/home/user/projects/demo$ cat fruits.txt | sort | uniq -c
+          3 apple
+          2 banana
+          1 cherry
+          1 date
+    ```
+  </Step>
+
+  <Step title="Use sed for transformation">
+    Replace text with sed:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ cat fruits.txt | sed 's/apple/orange/g'
+    orange
+    banana
+    orange
+    cherry
+    banana
+    date
+    orange
+    ```
+
+    The `s/old/new/g` pattern replaces all occurrences.
+  </Step>
+</Steps>
+
+## Command Chaining and Logic
+
+<Steps>
+  <Step title="Chain commands with && and ||">
+    Execute commands conditionally:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ mkdir output && echo "Success!" > output/status.txt
+    user@nash:/home/user/projects/demo$ cat output/status.txt
+    Success!
+
+    user@nash:/home/user/projects/demo$ test -f missing.txt || echo "File not found"
+    File not found
+
+    user@nash:/home/user/projects/demo$ test -f greeting.txt && echo "File exists"
+    File exists
+    ```
+
+    - `&&` runs the second command only if the first succeeds
+    - `||` runs the second command only if the first fails
+  </Step>
+
+  <Step title="Use command substitution">
+    Embed command output in other commands:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ echo "Current directory: $(pwd)"
+    Current directory: /home/user/projects/demo
+
+    user@nash:/home/user/projects/demo$ echo "File count: $(ls | wc -l)"
+    File count: 4
+
+    user@nash:/home/user/projects/demo$ touch file_$(date).txt
+    # Creates a file with the current date
+    ```
+  </Step>
+
+  <Step title="Use subshells for isolation">
+    Subshells keep environment changes contained:
+
+    ```bash
+    user@nash:/home/user/projects/demo$ pwd
+    /home/user/projects/demo
+
+    user@nash:/home/user/projects/demo$ (cd /tmp && pwd)
+    /tmp
+
+    user@nash:/home/user/projects/demo$ pwd
+    /home/user/projects/demo
+    ```
+
+    The `cd` inside `()` doesn't affect the outer shell.
+  </Step>
+</Steps>
+
+## Working with Host Directories
+
+<Steps>
+  <Step title="Exit Nash and create a test directory">
+    Press `Ctrl-D` to exit Nash, then create a directory on your real filesystem:
+
+    ```bash
+    mkdir ~/nash-demo
+    echo "This is a real file" > ~/nash-demo/real.txt
+    ```
+  </Step>
+
+  <Step title="Mount the directory in Nash">
+    Start Nash with a bind mount:
+
+    ```bash
+    nash --bind ~/nash-demo:/data
+    ```
+
+    <Info>
+      The `--bind` flag (or `-B`) mounts a host directory into the VFS at the specified path.
+    </Info>
+  </Step>
+
+  <Step title="Access mounted files">
+    Navigate to the mounted directory:
+
+    ```bash
+    user@nash:/home/user$ cd /data
+    user@nash:/data$ ls
+    real.txt
+
+    user@nash:/data$ cat real.txt
+    This is a real file
+
+    user@nash:/data$ echo "Added from Nash" >> real.txt
+    user@nash:/data$ cat real.txt
+    This is a real file
+    Added from Nash
+    ```
+
+    Exit Nash and verify the file was modified:
+
+    ```bash
+    user@nash:/data$ exit
+    $ cat ~/nash-demo/real.txt
+    This is a real file
+    Added from Nash
+    ```
+
+    <Warning>
+      Write access to mounted directories modifies real files! Use `--bind-ro` for read-only access.
+    </Warning>
+  </Step>
+
+  <Step title="Use read-only mounts">
+    Mount directories as read-only for safety:
+
+    ```bash
+    nash --bind-ro ~/nash-demo:/data
+    ```
+
+    ```bash
+    user@nash:/home/user$ cd /data
+    user@nash:/data$ cat real.txt
+    This is a real file
+    Added from Nash
+
+    user@nash:/data$ echo "Try to modify" >> real.txt
+    nash: filesystem is read-only: /data/real.txt
+    ```
+  </Step>
+</Steps>
+
+## Running Shell Scripts
+
+<Steps>
+  <Step title="Create a shell script">
+    Exit Nash and create a script file:
+
+    ```bash
+    cat > process-data.sh << 'EOF'
+#!/usr/bin/env nash
+
+# Create a report directory
+mkdir -p reports
+
+# Generate sample data
+echo "Processing data..."
+echo "apple" > data.txt
+echo "banana" >> data.txt
+echo "cherry" >> data.txt
+echo "apple" >> data.txt
+
+# Process and create report
+cat data.txt | sort | uniq -c > reports/summary.txt
+
+echo "Report generated:"
+cat reports/summary.txt
+EOF
+
+    chmod +x process-data.sh
+    ```
+  </Step>
+
+  <Step title="Execute the script">
+    Run the script with Nash:
+
+    ```bash
+    nash process-data.sh
+    ```
+
+    Output:
+
+    ```
+    Processing data...
+    Report generated:
+          2 apple
+          1 banana
+          1 cherry
+    ```
+
+    <Note>
+      All files created by the script exist only in Nash's VFS. Your real filesystem is not affected unless you use `--bind`.
+    </Note>
+  </Step>
+
+  <Step title="Run with host directory access">
+    Mount a directory to save output:
+
+    ```bash
+    mkdir ~/output
+    nash --bind ~/output:/reports process-data.sh
+    ```
+
+    Now the report is saved to your real `~/output/summary.txt` file.
+  </Step>
+</Steps>
+
+## Advanced Features
+
+### Process JSON Data
+
+Nash includes a built-in `jq` implementation:
+
+```bash
+user@nash:/home/user$ echo '{"name":"Nash","version":"0.1.0","features":["vfs","sandbox"]}' > info.json
+
+user@nash:/home/user$ cat info.json | jq .name
+"Nash"
+
+user@nash:/home/user$ cat info.json | jq .features
+["vfs","sandbox"]
+
+user@nash:/home/user$ cat info.json | jq 'keys'
+["features","name","version"]
+```
+
+### Use Shell Variables
+
+```bash
+user@nash:/home/user$ export PROJECT_NAME="MyApp"
+user@nash:/home/user$ echo "Working on $PROJECT_NAME"
+Working on MyApp
+
+user@nash:/home/user$ env | grep PROJECT
+PROJECT_NAME=MyApp
+```
+
+### Set Shell Options
+
+Run scripts with debugging:
+
+```bash
+nash -x script.sh          # Print each command before executing
+nash -e script.sh          # Exit immediately on error
+nash -u script.sh          # Error on unset variables
+```
+
+### Run Multiple Users
+
+Create different user environments:
+
+```bash
+nash -U alice              # Logged in as alice, home at /home/alice
+nash -U bob -C /projects   # Logged in as bob, starting in /projects
+```
+
+## Tips and Tricks
+
+<Tip>
+  **Navigation shortcuts:**
+  - `cd` — go to home directory
+  - `cd -` — go to previous directory
+  - `cd ~` — go to home directory
+</Tip>
+
+<Tip>
+  **Combine multiple mounts:**
+  
+  ```bash
+  nash -B ./src:/src -B ./data:/data --bind-ro ./config:/config -C /src
+  ```
+  
+  This mounts three directories and starts in `/src`.
+</Tip>
+
+<Tip>
+  **Use environment variables for configuration:**
+  
+  ```bash
+  nash -E DEBUG=true -E API_URL=http://localhost:8080 script.sh
+  ```
+</Tip>
+
+## What's Next?
+
+You now know the basics of Nash! Here are some next steps:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="CLI Reference" icon="terminal" href="/usage/cli-flags">
+    Learn about all available command-line flags and options
+  </Card>
+  
+  <Card title="Built-in Commands" icon="code" href="/commands/overview">
+    Explore the full list of 28 built-in commands
+  </Card>
+  
+  <Card title="Shell Syntax" icon="brackets-curly" href="/features/shell-syntax">
+    Deep dive into pipes, redirections, and advanced syntax
+  </Card>
+  
+  <Card title="Security Model" icon="shield" href="/features/sandbox-security">
+    Understand how Nash provides sandboxing guarantees
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Getting Help
+
+- Type `help` in the Nash REPL for command reference
+- Use `which <command>` to check if a command is available
+- Press `Ctrl-D` or type `exit` to quit Nash
+- Visit the [GitHub repository](https://github.com/sammwyy/nash) for issues and discussions

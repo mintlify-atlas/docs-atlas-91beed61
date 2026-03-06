@@ -1,122 +1,153 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Nash",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#94cb04",
+    "light": "#545454",
+    "dark": "#94cb04"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/288cc7c4-5cef-4376-950b-bdf0083eedae.png",
+  "logo": {
+    "light": "/logo.png",
+    "dark": "/logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/sammwyy/nash"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/sammwyy/nash"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Usage Guide",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "usage/interactive-mode",
+              "usage/script-execution",
+              "usage/cli-flags",
+              "usage/rc-files"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Core Features",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "features/sandbox-security",
+              "features/virtual-filesystem",
+              "features/host-mounts",
+              "features/environment-variables",
+              "features/shell-syntax"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Examples",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "examples/basic-commands",
+              "examples/pipes-redirections",
+              "examples/working-with-files",
+              "examples/scripting"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/parser",
+              "architecture/runtime",
+              "architecture/vfs",
+              "architecture/builtins"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Command Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "commands/overview"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "File Operations",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "commands/cat",
+              "commands/cp",
+              "commands/mv",
+              "commands/rm",
+              "commands/touch",
+              "commands/ls",
+              "commands/file",
+              "commands/stat"
+            ]
+          },
+          {
+            "group": "Directory Operations",
+            "pages": [
+              "commands/cd",
+              "commands/pwd",
+              "commands/mkdir",
+              "commands/tree",
+              "commands/find"
+            ]
+          },
+          {
+            "group": "Text Processing",
+            "pages": [
+              "commands/echo",
+              "commands/grep",
+              "commands/sed",
+              "commands/cut",
+              "commands/sort",
+              "commands/uniq",
+              "commands/wc",
+              "commands/head-tail"
+            ]
+          },
+          {
+            "group": "Data Processing",
+            "pages": [
+              "commands/jq"
+            ]
+          },
+          {
+            "group": "Environment & Shell",
+            "pages": [
+              "commands/env",
+              "commands/export",
+              "commands/unset",
+              "commands/test",
+              "commands/which",
+              "commands/history"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "commands/clear",
+              "commands/help",
+              "commands/true-false"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

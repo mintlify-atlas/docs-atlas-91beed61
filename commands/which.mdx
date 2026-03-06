@@ -1,0 +1,361 @@
+---
+title: which
+description: Show whether commands are Nash built-in commands
+---
+
+## Overview
+
+The `which` command checks if one or more commands are recognized Nash built-in commands. It reports whether each command is available and identifies it as a "nash builtin" if found.
+
+## Syntax
+
+```bash
+which COMMAND [COMMAND...]
+```
+
+## Description
+
+The `which` command verifies whether specified command names are recognized Nash built-in commands. Unlike the standard Unix `which` that searches for executables in PATH, Nash's `which` only checks against its list of built-in commands since Nash is a sandboxed shell that doesn't execute system binaries.
+
+## Options
+
+<Note>
+The `which` command does not accept any flags or options. It only accepts command names as arguments.
+</Note>
+
+## Arguments
+
+<ParamField path="COMMAND" type="string" required>
+  One or more command names to check. At least one command name must be provided.
+</ParamField>
+
+## Exit Status
+
+<Tabs>
+  <Tab title="Success (0)">
+    All specified commands are found:
+    ```bash
+    which ls cd pwd
+    # Output:
+    # ls (nash builtin)
+    # cd (nash builtin)
+    # pwd (nash builtin)
+    # Exit code: 0
+    ```
+  </Tab>
+  <Tab title="Failure (1)">
+    One or more commands are not found:
+    ```bash
+    which ls python
+    # Output:
+    # ls (nash builtin)
+    # python: not found
+    # Exit code: 1
+    ```
+  </Tab>
+</Tabs>
+
+## Examples
+
+### Check Single Command
+
+```bash
+which ls
+# Output: ls (nash builtin)
+```
+
+### Check Multiple Commands
+
+```bash
+which cat grep sed
+# Output:
+# cat (nash builtin)
+# grep (nash builtin)
+# sed (nash builtin)
+```
+
+### Check Non-Existent Command
+
+```bash
+which python
+# Output: python: not found
+```
+
+### Mixed Results
+
+```bash
+which echo docker ls
+# Output:
+# echo (nash builtin)
+# docker: not found
+# ls (nash builtin)
+```
+
+### Check if Command Exists (Script)
+
+```bash
+if which jq > /dev/null; then
+  echo "jq is available"
+else
+  echo "jq is not available"
+fi
+# Output: jq is available
+```
+
+### Silent Check
+
+```bash
+which grep > /dev/null && echo "Found"
+# Output: Found
+```
+
+## Available Nash Built-in Commands
+
+The following commands are recognized by `which`:
+
+<CodeGroup>
+```bash File Operations
+which cat cp mv rm touch mkdir
+# Output:
+# cat (nash builtin)
+# cp (nash builtin)
+# mv (nash builtin)
+# rm (nash builtin)
+# touch (nash builtin)
+# mkdir (nash builtin)
+```
+
+```bash Text Processing
+which grep sed cut sort uniq wc head tail
+# Output:
+# grep (nash builtin)
+# sed (nash builtin)
+# cut (nash builtin)
+# sort (nash builtin)
+# uniq (nash builtin)
+# wc (nash builtin)
+# head (nash builtin)
+# tail (nash builtin)
+```
+
+```bash Navigation & Info
+which cd pwd ls tree find stat
+# Output:
+# cd (nash builtin)
+# pwd (nash builtin)
+# ls (nash builtin)
+# tree (nash builtin)
+# find (nash builtin)
+# stat (nash builtin)
+```
+
+```bash Environment
+which env export unset echo clear
+# Output:
+# env (nash builtin)
+# export (nash builtin)
+# unset (nash builtin)
+# echo (nash builtin)
+# clear (nash builtin)
+```
+
+```bash Utilities
+which test true false which help history file jq
+# Output:
+# test (nash builtin)
+# true (nash builtin)
+# false (nash builtin)
+# which (nash builtin)
+# help (nash builtin)
+# history (nash builtin)
+# file (nash builtin)
+# jq (nash builtin)
+```
+</CodeGroup>
+
+## Practical Use Cases
+
+### Pre-flight Checks
+
+```bash
+# Verify required commands before running script
+REQUIRED="jq grep sed"
+for cmd in $REQUIRED; do
+  if ! which $cmd > /dev/null; then
+    echo "Error: Required command '$cmd' not found"
+    exit 1
+  fi
+done
+echo "All required commands available"
+```
+
+### Feature Detection
+
+```bash
+# Check if advanced features are available
+if which jq > /dev/null; then
+  echo "JSON processing available"
+  cat data.json | jq .
+else
+  echo "JSON processing not available"
+  cat data.json
+fi
+```
+
+### Command Availability Report
+
+```bash
+# Generate report of available tools
+echo "Checking available commands..."
+echo ""
+
+echo "Data Processing:"
+which jq grep sed awk | grep builtin
+
+echo ""
+echo "File Management:"
+which ls cp mv rm find | grep builtin
+```
+
+### Conditional Logic
+
+```bash
+# Use different commands based on availability
+if which tree > /dev/null; then
+  tree -L 2
+else
+  ls -R
+fi
+```
+
+### Debugging Scripts
+
+```bash
+# Debug which commands a script depends on
+echo "Script dependencies:"
+which cat grep sed jq echo test
+```
+
+### Documentation Generation
+
+```bash
+# List all available commands
+echo "Available Nash commands:"
+which cat cd clear cp cut echo env export false file find grep head \
+     help history jq ls mkdir mv pwd rm sed sort stat tail test touch \
+     tree true uniq unset wc which | grep builtin | cut -d' ' -f1
+```
+
+## Checking Test Command
+
+The `test` command has two names:
+
+```bash
+which test
+# Output: test (nash builtin)
+
+which [
+# Output: [ (nash builtin)
+```
+
+Both refer to the same command.
+
+## Error Handling
+
+```bash
+# Missing argument
+which
+# Output: which: missing argument
+# Exit code: 1
+
+# Multiple commands, some not found
+which ls docker python grep
+# Output:
+# ls (nash builtin)
+# docker: not found
+# python: not found
+# grep (nash builtin)
+# Exit code: 1 (because some were not found)
+```
+
+## Comparison with Unix which
+
+<Warning>
+Nash's `which` behaves differently from standard Unix `which`:
+
+**Unix which:**
+- Searches for executables in PATH
+- Returns full path to executable
+- Can find system binaries, scripts, etc.
+
+**Nash which:**
+- Only checks Nash built-in commands
+- Returns "(nash builtin)" for found commands
+- Cannot find system binaries (Nash is sandboxed)
+
+```bash
+# Unix which
+which python
+# Output: /usr/bin/python
+
+# Nash which
+which python
+# Output: python: not found
+```
+</Warning>
+
+## Notes
+
+<Note>
+- At least one command name must be provided
+- Command names are case-sensitive
+- Exit code is 0 only if all commands are found
+- Exit code is 1 if any command is not found
+- Nash only recognizes its built-in commands
+- System commands like `git`, `python`, `node`, etc. will always return "not found"
+</Note>
+
+## Full List of Recognized Commands
+
+All 28+ Nash built-in commands:
+
+- `[` - Test command (alternate syntax)
+- `cat` - Concatenate and display files
+- `cd` - Change directory
+- `clear` - Clear terminal screen
+- `cp` - Copy files
+- `cut` - Cut fields from lines
+- `echo` - Print text
+- `env` - List environment variables
+- `export` - Set environment variables
+- `false` - Return false (exit 1)
+- `file` - Detect file type
+- `find` - Search for files
+- `grep` - Filter lines by pattern
+- `head` - Show first lines
+- `help` - Show help information
+- `history` - Show command history
+- `jq` - Process JSON data
+- `ls` - List directory contents
+- `mkdir` - Create directories
+- `mv` - Move or rename files
+- `pwd` - Print working directory
+- `rm` - Remove files/directories
+- `sed` - Stream editor
+- `sort` - Sort lines
+- `stat` - File status information
+- `tail` - Show last lines
+- `test` - Evaluate expressions
+- `touch` - Create empty files
+- `tree` - Display directory tree
+- `true` - Return true (exit 0)
+- `uniq` - Filter duplicate lines
+- `unset` - Unset environment variables
+- `wc` - Count lines/words/bytes
+- `which` - Show command availability
+
+## Related Commands
+
+- [help](/commands/help) - Display comprehensive help for all commands
+- [test](/commands/test) - Test if conditions are true
+- [history](/commands/history) - Show previously executed commands

@@ -1,0 +1,320 @@
+---
+title: 'mkdir'
+description: 'Create new directories'
+---
+
+## Syntax
+
+```bash
+mkdir [-p] directory...
+```
+
+## Description
+
+The `mkdir` command creates one or more directories within Nash's virtual filesystem. By default, it creates only the final directory in a path and fails if parent directories don't exist. With the `-p` flag, it creates all necessary parent directories automatically.
+
+<Note>
+  All directories are created within Nash's Virtual Filesystem (VFS). To create directories on the host system, you must mount a host directory with write permissions using `--bind`.
+</Note>
+
+## Options
+
+<ParamField path="-p" type="flag">
+  Create parent directories as needed. If parent directories already exist, no error is reported. This allows creating deep directory structures in a single command.
+</ParamField>
+
+## Arguments
+
+<ParamField path="directory" type="string" required>
+  One or more directory paths to create. Can be absolute paths (starting with `/`) or relative paths from the current working directory. Multiple directories can be specified separated by spaces.
+</ParamField>
+
+## Behavior
+
+1. **Without `-p`**: Creates only the final directory, fails if parent directories don't exist
+2. **With `-p`**: Creates all parent directories in the path automatically
+3. **Multiple directories**: Can create several directories in one command
+4. **Existing directories**: With `-p`, silently succeeds if directory already exists; without `-p`, may report error
+5. **Path resolution**: Relative paths are resolved from current working directory
+
+## Examples
+
+### Create a single directory
+
+```bash
+user@nash:/home/user$ mkdir projects
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  projects/  welcome.txt
+```
+
+### Create multiple directories
+
+```bash
+user@nash:/home/user$ mkdir docs videos music
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  docs/  music/  videos/  welcome.txt
+```
+
+### Create nested directories with -p
+
+```bash
+user@nash:/home/user$ mkdir -p projects/nash/src/builtins
+user@nash:/home/user$ tree projects
+projects
+└── nash/
+    └── src/
+        └── builtins/
+
+3 directories, 0 files
+```
+
+### Create directory with absolute path
+
+```bash
+user@nash:/home/user$ mkdir /tmp/workdir
+user@nash:/home/user$ ls /tmp
+workdir/
+```
+
+### Create multiple nested paths
+
+```bash
+user@nash:/home/user$ mkdir -p project/src project/tests project/docs
+user@nash:/home/user$ tree project
+project
+├── docs/
+├── src/
+└── tests/
+
+3 directories, 0 files
+```
+
+### Use in command chains
+
+```bash
+user@nash:/home/user$ mkdir build && cd build && pwd
+/home/user/build
+```
+
+### Create and populate directory
+
+```bash
+user@nash:/home/user$ mkdir reports && cd reports && touch q1.txt q2.txt
+user@nash:/home/user/reports$ ls
+q1.txt  q2.txt
+```
+
+## Error Handling
+
+### Missing operand
+
+```bash
+user@nash:/home/user$ mkdir
+mkdir: missing operand
+```
+
+<Warning>
+  At least one directory path must be provided to `mkdir`.
+</Warning>
+
+### Parent directory doesn't exist (without -p)
+
+```bash
+user@nash:/home/user$ mkdir deep/nested/dir
+Error: parent directory does not exist
+```
+
+**Solution**: Use the `-p` flag:
+
+```bash
+user@nash:/home/user$ mkdir -p deep/nested/dir
+user@nash:/home/user$ tree deep
+deep
+└── nested/
+    └── dir/
+
+2 directories, 0 files
+```
+
+### Directory already exists
+
+With `-p` flag, this silently succeeds:
+
+```bash
+user@nash:/home/user$ mkdir -p projects
+user@nash:/home/user$ mkdir -p projects
+# No error - succeeds silently
+```
+
+### Invalid path
+
+```bash
+user@nash:/home/user$ touch file.txt
+user@nash:/home/user$ mkdir file.txt/subdir
+Error: cannot create directory
+```
+
+<Warning>
+  Cannot create a directory inside a file or through a non-directory path.
+</Warning>
+
+## VFS Integration
+
+### Creating directories in mounted volumes
+
+When working with mounted host directories (read-write), `mkdir` creates real directories on the host:
+
+```bash
+# Start Nash with a read-write mount
+$ nash --bind ./myproject:/project
+
+user@nash:/home/user$ cd /project
+user@nash:/project$ mkdir src tests
+user@nash:/project$ ls
+src/  tests/
+
+# These directories now exist in host ./myproject/ directory
+```
+
+### Read-only mounts
+
+Attempting to create directories in read-only mounted paths will fail:
+
+```bash
+$ nash --bind-ro ./readonly:/data
+
+user@nash:/home/user$ mkdir /data/newdir
+Error: cannot create directory (read-only filesystem)
+```
+
+<Warning>
+  Directories cannot be created in read-only mounted paths. Use `--bind` instead of `--bind-ro` if you need write access.
+</Warning>
+
+## Common Patterns
+
+### Project scaffolding
+
+```bash
+user@nash:/home/user$ mkdir -p myapp/src myapp/tests myapp/docs myapp/config
+user@nash:/home/user$ tree myapp
+myapp
+├── config/
+├── docs/
+├── src/
+└── tests/
+
+4 directories, 0 files
+```
+
+### Temporary workspace
+
+```bash
+user@nash:/home/user$ mkdir -p /tmp/workspace && cd /tmp/workspace
+user@nash:/tmp/workspace$ pwd
+/tmp/workspace
+```
+
+### Date-based directories
+
+```bash
+user@nash:/home/user$ mkdir -p logs/2026/03/06
+user@nash:/home/user$ tree logs
+logs
+└── 2026/
+    └── 03/
+        └── 06/
+
+3 directories, 0 files
+```
+
+### Conditional directory creation
+
+```bash
+user@nash:/home/user$ test -d backup || mkdir backup
+user@nash:/home/user$ ls
+Desktop/  Documents/  Downloads/  backup/  welcome.txt
+```
+
+## Combining with Other Commands
+
+### With cd to navigate into new directory
+
+```bash
+user@nash:/home/user$ mkdir workspace && cd workspace && pwd
+/home/user/workspace
+```
+
+### With find to verify creation
+
+```bash
+user@nash:/home/user$ mkdir -p a/b/c a/b/d a/e
+user@nash:/home/user$ find a -type d
+a
+a/b
+a/b/c
+a/b/d
+a/e
+```
+
+### With tree to visualize structure
+
+```bash
+user@nash:/home/user$ mkdir -p project/{src,tests,docs}
+user@nash:/home/user$ tree project
+project
+├── docs/
+├── src/
+└── tests/
+
+3 directories, 0 files
+```
+
+### With touch to create files
+
+```bash
+user@nash:/home/user$ mkdir data && touch data/file1.txt data/file2.txt
+user@nash:/home/user$ ls data
+file1.txt  file2.txt
+```
+
+## Exit Codes
+
+- **0** - Success: all directories created successfully
+- **1** - Error: missing operand or directory creation failed
+
+## Related Commands
+
+- [`cd`](/commands/cd) - Change to the newly created directory
+- [`rmdir`](/commands/rm) - Remove empty directories (use `rm -r` for non-empty)
+- [`ls`](/commands/ls) - List directory contents
+- [`tree`](/commands/tree) - Display directory structure
+- [`pwd`](/commands/pwd) - Show current directory
+- [`find`](/commands/find) - Search for directories with `-type d`
+
+## Implementation Details
+
+The `mkdir` command is implemented in `/home/daytona/workspace/source/src/builtins/mkdir.rs:9-35`. Key implementation notes:
+
+- Parses arguments to separate `-p` flag from directory paths
+- Without `-p`: calls `vfs.mkdir()` which creates only the final directory
+- With `-p`: calls `vfs.mkdir_p()` which creates all parent directories
+- All paths are resolved relative to current working directory using `VfsPath::join()`
+- Returns error if no directory paths are provided
+- Processes all directories even if some fail (doesn't stop at first error)
+
+## Comparison to Traditional Unix mkdir
+
+Nash's `mkdir` implements the most common functionality:
+
+| Feature | Nash mkdir | Unix mkdir |
+|---------|------------|------------|
+| `-p` flag | ✓ Supported | ✓ Supported |
+| `-m` mode | ✗ Not supported | ✓ Set permissions |
+| `-v` verbose | ✗ Not supported | ✓ Print created directories |
+| Multiple directories | ✓ Supported | ✓ Supported |
+| Permissions | N/A (VFS has no permissions) | Configurable |
+
+<Note>
+  Nash's VFS doesn't implement Unix file permissions, so the `-m` flag for setting directory modes is not needed.
+</Note>

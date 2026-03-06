@@ -1,0 +1,606 @@
+---
+title: 'Shell Syntax'
+description: 'Complete reference for Nash shell syntax and operators'
+---
+
+Nash supports a practical subset of Bash syntax, including pipes, redirections, conditionals, subshells, and expansions.
+
+## Simple Commands
+
+A command consists of a name followed by zero or more arguments:
+
+```bash
+echo hello world
+ls /tmp
+mkdir -p /home/user/projects
+cat file.txt
+```
+
+Nash looks up the command in its built-in table. If not found, you get:
+
+```bash
+user@nash:/home/user$ nonexistent_cmd
+nash: command not found: nonexistent_cmd
+```
+
+<Note>
+Nash has 28 built-in commands. There is no `$PATH` search for external binaries—everything runs in-memory.
+</Note>
+
+## Pipes
+
+Connect the standard output of one command to the standard input of another using `|`:
+
+```bash
+echo hello | cat
+cat file.txt | grep pattern
+ls /tmp | wc -l
+echo -e "c\nb\na" | sort | uniq
+```
+
+### Chaining Multiple Pipes
+
+```bash
+cat data.txt | grep error | sort | uniq -c
+find /var/log -name "*.log" | head -5 | cat
+```
+
+### Implementation
+
+The parser creates a `Pipe` AST node:
+
+```rust Pipe execution
+// src/runtime/executor.rs
+Expr::Pipe { left, right } => {
+    let left_out = self.eval(left, stdin)?;
+    self.eval(right, &left_out.stdout)  // Right side gets left's stdout
+}
+```
+
+<Accordion title="Pipe examples">
+```bash Filter lines
+echo -e "apple\nbanana\napricot" | grep "^a"
+# apple
+# apricot
+```
+
+```bash Count matches
+cat /var/log/app.log | grep ERROR | wc -l
+# 42
+```
+
+```bash Transform and sort
+cat names.txt | cut -d: -f1 | sort
+```
+</Accordion>
+
+## Redirections
+
+Control where input comes from and output goes to:
+
+### Output Redirection (`>`)
+
+Overwrite or create a file:
+
+```bash
+echo hello > /tmp/out.txt
+ls /home/user > files.txt
+```
+
+**Result:** File contains only the new output.
+
+### Append Redirection (`>>`)
+
+Append to a file:
+
+```bash
+echo first > log.txt
+echo second >> log.txt
+cat log.txt
+# first
+# second
+```
+
+### Input Redirection (`<`)
+
+Read from a file:
+
+```bash
+cat < input.txt
+grep pattern < data.txt
+wc -l < file.txt
+```
+
+### Combined Redirections
+
+```bash
+cat < input.txt > output.txt
+grep error < app.log >> errors.txt
+```
+
+### How Redirections Work
+
+```rust Redirect execution
+// src/runtime/executor.rs
+fn eval_redirect(
+    &mut self,
+    expr: &Expr,
+    file: &Word,
+    mode: &RedirectMode,
+    stdin: &str,
+) -> Result<Output> {
+    match mode {
+        RedirectMode::Input => {
+            let path = self.expand_word(file)?;
+            let content = self.ctx.vfs.read_to_string(&abs_path)?;
+            self.eval(expr, &content)  // Pass file content as stdin
+        }
+        RedirectMode::Overwrite => {
+            let output = self.eval(expr, stdin)?;
+            self.ctx.vfs.write_str(&abs_path, &output.stdout)?;
+            Ok(Output { stdout: String::new(), ..output })  // Consumed
+        }
+        RedirectMode::Append => {
+            let output = self.eval(expr, stdin)?;
+            self.ctx.vfs.append(&abs_path, output.stdout.as_bytes())?;
+            Ok(Output { stdout: String::new(), ..output })
+        }
+    }
+}
+```
+
+## Chaining (&&, ||, ;)
+
+### AND Operator (`&&`)
+
+Run the second command only if the first **succeeds** (exit code 0):
+
+```bash
+mkdir /tmp/build && cd /tmp/build
+test -f config.json && cat config.json
+grep pattern file.txt && echo "Found"
+```
+
+**Behavior:**
+
+```bash
+user@nash:/home/user$ true && echo "yes"
+yes
+
+user@nash:/home/user$ false && echo "yes"
+# (no output — second command skipped)
+```
+
+### OR Operator (`||`)
+
+Run the second command only if the first **fails** (exit code non-zero):
+
+```bash
+test -f config.json || echo "Config missing"
+grep pattern file.txt || echo "No matches"
+```
+
+**Behavior:**
+
+```bash
+user@nash:/home/user$ true || echo "fallback"
+# (no output — first command succeeded)
+
+user@nash:/home/user$ false || echo "fallback"
+fallback
+```
+
+### Sequence Operator (`;`)
+
+Run commands sequentially regardless of success:
+
+```bash
+echo start ; echo end
+mkdir /tmp/test ; cd /tmp/test ; pwd
+```
+
+**Behavior:**
+
+```bash
+user@nash:/home/user$ false ; echo "still runs"
+still runs
+```
+
+### Combining Operators
+
+```bash
+test -d /tmp/build || mkdir /tmp/build && cd /tmp/build
+grep error app.log && echo "Errors found" || echo "No errors"
+```
+
+### Implementation
+
+```rust Conditional execution
+// src/runtime/executor.rs
+Expr::And { left, right } => {
+    let left_out = self.eval(left, stdin)?;
+    if left_out.is_success() {
+        self.eval(right, stdin)  // Only run if left succeeded
+    } else {
+        Ok(left_out)
+    }
+}
+
+Expr::Or { left, right } => {
+    let left_out = self.eval(left, stdin)?;
+    if !left_out.is_success() {
+        self.eval(right, stdin)  // Only run if left failed
+    } else {
+        Ok(left_out)
+    }
+}
+
+Expr::Sequence { left, right } => {
+    let left_out = self.eval(left, stdin)?;
+    // Print left output, then run right unconditionally
+    print!("{}", left_out.stdout);
+    self.eval(right, stdin)
+}
+```
+
+## Subshells
+
+Group commands with `( )` to run in an isolated environment:
+
+```bash
+(cd /tmp && ls)
+pwd  # Still in original directory
+```
+
+**Environment isolation:**
+
+```bash
+user@nash:/home/user$ export VAR=outer
+
+user@nash:/home/user$ (export VAR=inner; echo $VAR)
+inner
+
+user@nash:/home/user$ echo $VAR
+outer
+```
+
+### How Subshells Work
+
+The executor clones the context before evaluation:
+
+```rust Subshell isolation
+// src/runtime/executor.rs
+Expr::Subshell { expr } => {
+    // Save current state
+    let saved_cwd = self.ctx.cwd.clone();
+    let saved_env = self.ctx.env.clone();
+    
+    // Execute subshell
+    let result = self.eval(expr, stdin);
+    
+    // Restore state (changes don't escape)
+    self.ctx.cwd = saved_cwd;
+    self.ctx.env = saved_env;
+    
+    result
+}
+```
+
+<Warning>
+Subshells isolate:
+- Environment variable changes (`export`)
+- Directory changes (`cd`)
+
+But they **do not** isolate:
+- VFS file writes (files created in a subshell persist)
+- Exit codes (subshell failure propagates)
+</Warning>
+
+## Variable Expansion
+
+Substitute variable values with `$VAR` or `${VAR}`:
+
+### Basic Expansion
+
+```bash
+user@nash:/home/user$ echo $HOME
+/home/user
+
+user@nash:/home/user$ echo $USER
+user
+
+user@nash:/home/user$ export GREETING=hello
+user@nash:/home/user$ echo $GREETING world
+hello world
+```
+
+### Braced Expansion
+
+Use `${VAR}` to delimit variable names:
+
+```bash
+user@nash:/home/user$ export PREFIX=test
+
+user@nash:/home/user$ echo ${PREFIX}_file.txt
+test_file.txt
+
+user@nash:/home/user$ echo $PREFIXfile.txt
+# Looks for variable "PREFIXfile" (likely empty)
+```
+
+### Undefined Variables
+
+Missing variables expand to empty strings:
+
+```bash
+user@nash:/home/user$ echo $UNDEFINED
+# (empty line)
+
+user@nash:/home/user$ echo "Value: $UNDEFINED"
+Value: 
+```
+
+### Lexer Implementation
+
+The lexer parses `$` and creates a `WordPart::Variable`:
+
+```rust Variable parsing
+// src/parser/lexer.rs
+fn read_dollar(&mut self) -> Result<WordPart, ParseError> {
+    self.advance(); // consume '$'
+    
+    match self.current_char() {
+        '{' => {
+            // ${VARNAME}
+            self.advance();
+            let name = self.read_identifier();
+            if self.current_char() == '}' {
+                self.advance();
+                Ok(WordPart::Variable(name))
+            } else {
+                Err(ParseError::Unmatched('{'))
+            }
+        }
+        _ => {
+            // $VARNAME
+            let name = self.read_identifier();
+            Ok(WordPart::Variable(name))
+        }
+    }
+}
+```
+
+## Command Substitution
+
+Capture command output with `$(cmd)`:
+
+```bash
+echo "Files: $(ls | wc -l)"
+echo "Current dir: $(pwd)"
+export BUILD_DATE=$(date)
+```
+
+### Nested Substitution
+
+```bash
+echo "Lines in logs: $(cat $(find /var/log -name '*.log') | wc -l)"
+```
+
+### Trailing Newline Removal
+
+Nash trims the final newline (Bash-compatible behavior):
+
+```bash
+user@nash:/home/user$ echo $(echo hello)
+hello
+# Not "hello\n"
+```
+
+### Implementation
+
+```rust Command substitution
+// src/runtime/executor.rs
+WordPart::CommandSubst(expr) => {
+    let output = self.eval(expr, "")?;
+    // Trim trailing newline
+    result.push_str(output.stdout.trim_end_matches('\n'));
+}
+```
+
+### Examples
+
+```bash
+user@nash:/home/user$ echo "You are in $(pwd)"
+You are in /home/user
+
+user@nash:/home/user$ export FILE_COUNT=$(ls | wc -l)
+user@nash:/home/user$ echo $FILE_COUNT
+4
+
+user@nash:/home/user$ cat $(echo /etc/hostname)
+nash
+```
+
+## Quoting
+
+### Single Quotes (Literal)
+
+Preserve everything literally—no expansions:
+
+```bash
+user@nash:/home/user$ echo '$HOME is $USER'
+$HOME is $USER
+
+user@nash:/home/user$ echo '$(pwd)'
+$(pwd)
+```
+
+### Double Quotes (Expansion Enabled)
+
+Expand variables and command substitutions:
+
+```bash
+user@nash:/home/user$ echo "$HOME is $USER"
+/home/user is user
+
+user@nash:/home/user$ echo "Current: $(pwd)"
+Current: /home/user
+```
+
+### Escape Sequences
+
+Use backslash `\` to escape special characters:
+
+```bash
+user@nash:/home/user$ echo \$HOME
+$HOME
+
+user@nash:/home/user$ echo "Literal \$VAR"
+Literal $VAR
+```
+
+Inside double quotes, `\` escapes `$`, `` ` ``, `"`, and `\`.
+
+### Lexer Quoting Logic
+
+```rust Single-quote parsing
+// src/parser/lexer.rs
+'\'' => {
+    self.advance(); // opening '
+    while self.pos < self.src.len() && self.current_char() != '\'' {
+        literal_buf.push(self.current_char());
+        self.advance();
+    }
+    if self.pos >= self.src.len() {
+        return Err(ParseError::Unmatched('\''));
+    }
+    self.advance(); // closing '
+}
+```
+
+```rust Double-quote parsing
+'"' => {
+    self.advance(); // opening "
+    while self.pos < self.src.len() && self.current_char() != '"' {
+        if self.current_char() == '$' {
+            // Flush literal, read expansion
+            if !literal_buf.is_empty() {
+                parts.push(WordPart::Literal(std::mem::take(&mut literal_buf)));
+            }
+            let part = self.read_dollar()?;
+            parts.push(part);
+        } else if self.current_char() == '\\' {
+            self.advance();
+            literal_buf.push(self.current_char());
+            self.advance();
+        } else {
+            literal_buf.push(self.current_char());
+            self.advance();
+        }
+    }
+    self.advance(); // closing "
+}
+```
+
+## Comments
+
+Lines starting with `#` are ignored:
+
+```bash
+# This is a comment
+echo hello  # Inline comment
+```
+
+Nash stops parsing when it sees `#`:
+
+```bash
+user@nash:/home/user$ echo hello # this is ignored
+hello
+```
+
+### Lexer Implementation
+
+```rust Comment handling
+// src/parser/lexer.rs
+if ch == '#' {
+    tokens.push(Token::Eof);  // Treat rest of line as end-of-input
+    break;
+}
+```
+
+<Note>
+Nash does not support mid-line comments unless preceded by whitespace. `echo hello#world` would be parsed as a single argument.
+</Note>
+
+## Complete Syntax Example
+
+Combining all features:
+
+```bash Example script
+#!/usr/bin/env nash
+
+# Setup
+export BUILD_DIR=/tmp/build
+export SRC_DIR=/src
+
+# Ensure build directory exists
+mkdir -p $BUILD_DIR || (echo "Failed to create build dir" && exit 1)
+
+# Copy source files
+cp -r $SRC_DIR/* $BUILD_DIR/ && echo "Sources copied"
+
+# Process files
+find $BUILD_DIR -name "*.txt" | while read file; do
+    cat "$file" | grep pattern >> $BUILD_DIR/results.txt
+done
+
+# Generate report
+echo "Build completed at $(date)" > $BUILD_DIR/report.txt
+echo "Files processed: $(ls $BUILD_DIR | wc -l)" >> $BUILD_DIR/report.txt
+
+# Display summary
+cat $BUILD_DIR/report.txt
+
+# Cleanup (runs even if above fails)
+test -f $BUILD_DIR/temp.txt && rm $BUILD_DIR/temp.txt ; echo "Done"
+```
+
+## Syntax Summary Table
+
+| Feature | Syntax | Example |
+|---------|--------|--------|
+| **Simple command** | `cmd args` | `echo hello` |
+| **Pipe** | `cmd1 \| cmd2` | `cat file \| grep pattern` |
+| **Redirect output** | `cmd > file` | `echo hello > out.txt` |
+| **Redirect append** | `cmd >> file` | `echo world >> out.txt` |
+| **Redirect input** | `cmd < file` | `cat < in.txt` |
+| **AND** | `cmd1 && cmd2` | `mkdir dir && cd dir` |
+| **OR** | `cmd1 \|\| cmd2` | `test -f x \|\| echo missing` |
+| **Sequence** | `cmd1 ; cmd2` | `echo a ; echo b` |
+| **Subshell** | `( cmds )` | `(cd /tmp && ls)` |
+| **Variable** | `$VAR` or `${VAR}` | `echo $HOME` |
+| **Command subst** | `$(cmd)` | `echo $(pwd)` |
+| **Single quote** | `'text'` | `echo '$HOME'` |
+| **Double quote** | `"text"` | `echo "$HOME"` |
+| **Escape** | `\char` | `echo \$VAR` |
+| **Comment** | `# text` | `# This is a comment` |
+
+## Not Supported
+
+Nash intentionally omits some Bash features:
+
+<Warning>
+**Not implemented:**
+- Background jobs (`&`)
+- Here-documents (`<< EOF`)
+- Process substitution (`<(cmd)`)
+- Brace expansion (`{a,b,c}`)
+- Glob patterns in words (`*.txt`)
+- Arithmetic expansion (`$((1 + 1))`)
+- Arrays
+- Functions
+- Control structures (`if`, `for`, `while`)
+- Case statements
+</Warning>
+
+For missing features, use command chaining and built-in commands creatively, or write a script in a full language and execute it via Nash.

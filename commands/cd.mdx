@@ -1,0 +1,188 @@
+---
+title: 'cd'
+description: 'Change the current working directory'
+---
+
+## Syntax
+
+```bash
+cd [directory]
+cd -
+cd
+```
+
+## Description
+
+The `cd` command changes the current working directory within Nash's virtual filesystem. When you change directories, Nash automatically updates the `$PWD` environment variable to reflect the new location and saves the previous directory in `$OLDPWD`.
+
+<Note>
+  All directory changes happen within Nash's Virtual Filesystem (VFS). Host directories are only accessible through explicit mount bindings using `--bind` or `--bind-ro` flags when starting Nash.
+</Note>
+
+## Arguments
+
+<ParamField path="directory" type="string" optional>
+  The target directory to change to. Can be an absolute path (starting with `/`) or relative path.
+  
+  **Special values:**
+  - No argument: Changes to `$HOME` directory (default: `/home/user`)
+  - `-`: Changes to the previous directory stored in `$OLDPWD`
+</ParamField>
+
+## Behavior
+
+1. **No arguments** - Navigates to the user's home directory from the `$HOME` environment variable
+2. **Relative paths** - Resolved relative to the current working directory (`$PWD`)
+3. **Absolute paths** - Navigate directly to the specified path
+4. **`cd -`** - Toggle to the previous working directory using `$OLDPWD`
+5. **Environment updates** - Automatically sets `$PWD` to new directory and `$OLDPWD` to previous directory
+
+## Examples
+
+### Navigate to absolute path
+
+```bash
+user@nash:/home/user$ cd /etc
+user@nash:/etc$ pwd
+/etc
+```
+
+### Navigate to relative path
+
+```bash
+user@nash:/home/user$ mkdir projects
+user@nash:/home/user$ cd projects
+user@nash:/home/user/projects$ pwd
+/home/user/projects
+```
+
+### Go back to previous directory
+
+```bash
+user@nash:/home/user$ cd /tmp
+user@nash:/tmp$ cd /etc
+user@nash:/etc$ cd -
+user@nash:/tmp$ pwd
+/tmp
+```
+
+### Return to home directory
+
+```bash
+user@nash:/etc$ cd
+user@nash:/home/user$ pwd
+/home/user
+```
+
+### Navigate using environment variables
+
+```bash
+user@nash:/$ cd $HOME/Documents
+user@nash:/home/user/Documents$ pwd
+/home/user/Documents
+```
+
+### Use with subshells
+
+```bash
+user@nash:/home/user$ pwd
+/home/user
+user@nash:/home/user$ (cd /tmp && pwd)
+/tmp
+user@nash:/home/user$ pwd
+/home/user
+```
+
+<Note>
+  Changes made inside a subshell `( )` do not affect the parent shell's working directory.
+</Note>
+
+## Error Handling
+
+### Directory does not exist
+
+```bash
+user@nash:/home/user$ cd nonexistent
+cd: not a directory: nonexistent
+```
+
+### Not a directory (file path provided)
+
+```bash
+user@nash:/home/user$ touch file.txt
+user@nash:/home/user$ cd file.txt
+cd: not a directory: file.txt
+```
+
+### No previous directory
+
+```bash
+user@nash:/home/user$ unset OLDPWD
+user@nash:/home/user$ cd -
+user@nash:/$ pwd
+/
+```
+
+<Note>
+  If `$OLDPWD` is not set, `cd -` defaults to the root directory `/`.
+</Note>
+
+## VFS Integration
+
+### Working with mounted directories
+
+When starting Nash with host directory mounts, you can navigate into them normally:
+
+```bash
+# Start Nash with a mount
+$ nash --bind ./myproject:/project
+
+user@nash:/home/user$ cd /project
+user@nash:/project$ ls
+# Shows files from host ./myproject directory
+```
+
+### Read-only mounts
+
+You can `cd` into read-only mounted directories without any restrictions:
+
+```bash
+$ nash --bind-ro ./config:/config
+
+user@nash:/home/user$ cd /config
+user@nash:/config$ pwd
+/config
+user@nash:/config$ cat settings.json
+# Read operations work normally
+```
+
+## Environment Variables
+
+<ParamField path="$PWD" type="string">
+  Automatically updated to the new current working directory after each successful `cd` command.
+</ParamField>
+
+<ParamField path="$OLDPWD" type="string">
+  Automatically updated to store the previous working directory before changing to a new one. Used by `cd -`.
+</ParamField>
+
+<ParamField path="$HOME" type="string">
+  Used as the target directory when `cd` is called without arguments. Default: `/home/<username>`
+</ParamField>
+
+## Related Commands
+
+- [`pwd`](/commands/pwd) - Print the current working directory
+- [`mkdir`](/commands/mkdir) - Create new directories
+- [`ls`](/commands/ls) - List directory contents
+- [`tree`](/commands/tree) - Display directory structure as a tree
+
+## Implementation Details
+
+The `cd` command is implemented in `/home/daytona/workspace/source/src/builtins/cd.rs:9-41`. Key implementation notes:
+
+- Validates that the target path exists and is a directory before changing
+- Uses `VfsPath::join()` to resolve relative paths against the current directory
+- Always updates both `$PWD` and `$OLDPWD` environment variables
+- Falls back to `/home/user` if `$HOME` is not defined
+- Falls back to `/` if `$OLDPWD` is not set when using `cd -`

@@ -1,0 +1,437 @@
+---
+title: CLI Flags
+description: Complete reference for all Nash command-line flags and options
+---
+
+## Usage Syntax
+
+```
+nash [OPTIONS] [SCRIPT]
+```
+
+Nash accepts standard shell flags (bash/sh compatible), Nash-specific flags for sandboxing, and general options.
+
+## Positional Arguments
+
+<ParamField path="SCRIPT" type="string">
+  Shell script file to execute from the host filesystem.
+  
+  ```bash
+  nash script.sh
+  nash ./deploy.sh
+  nash /path/to/file.sh
+  ```
+  
+  If no script is provided and stdin is a TTY, Nash starts in interactive REPL mode.
+</ParamField>
+
+## Standard Shell Flags
+
+These flags are compatible with bash, sh, and other POSIX shells.
+
+<ParamField path="-c" type="string">
+  Execute a command string and exit.
+  
+  ```bash
+  nash -c "echo hello | grep hello"
+  nash -c 'pwd && ls'
+  ```
+  
+  Equivalent to bash's `-c` flag.
+</ParamField>
+
+<ParamField path="-i" type="boolean">
+  Force interactive mode even when stdin is not a TTY.
+  
+  ```bash
+  nash -i
+  echo "pwd" | nash -i
+  ```
+  
+  Useful for debugging or when you want the REPL despite piped input.
+</ParamField>
+
+<ParamField path="-l, --login" type="boolean">
+  Login shell mode. Sources `/etc/profile` then `~/.nashrc` from the VFS.
+  
+  ```bash
+  nash -l
+  nash --login
+  ```
+  
+  Can be combined with script execution:
+  
+  ```bash
+  nash -l script.sh
+  ```
+</ParamField>
+
+<ParamField path="-s, --stdin" type="boolean">
+  Read commands from stdin instead of starting the REPL or running a script.
+  
+  ```bash
+  cat commands.txt | nash -s
+  nash -s < input.sh
+  ```
+  
+  When stdin is not a TTY, `-s` is implicit if no script or `-c` is provided.
+</ParamField>
+
+<ParamField path="-e, --errexit" type="boolean">
+  Exit immediately if any command exits with a non-zero status.
+  
+  ```bash
+  nash -e script.sh
+  nash -e -c "false && echo 'not reached'"
+  ```
+  
+  Equivalent to `set -e` in bash. Critical for robust scripts.
+</ParamField>
+
+<ParamField path="-u, --nounset" type="boolean">
+  Treat references to unset variables as errors.
+  
+  ```bash
+  nash -u script.sh
+  nash -u -c 'echo $UNDEFINED_VAR'  # Errors out
+  ```
+  
+  Equivalent to `set -u` in bash.
+</ParamField>
+
+<ParamField path="-x, --xtrace" type="boolean">
+  Print each command to stderr before executing.
+  
+  ```bash
+  nash -x script.sh
+  ```
+  
+  Output example:
+  ```
+  + echo "hello"
+  hello
+  + mkdir /tmp/test
+  ```
+  
+  Equivalent to `set -x` in bash. Essential for debugging scripts.
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean">
+  Print each input line to stderr as it is read, before parsing.
+  
+  ```bash
+  nash -v script.sh
+  ```
+  
+  Equivalent to `set -v` in bash.
+</ParamField>
+
+### Combining Shell Flags
+
+Flags can be combined for powerful script control:
+
+<CodeGroup>
+```bash All safety flags
+nash -eux script.sh  # errexit + nounset + xtrace
+```
+
+```bash Debug mode
+nash -xv script.sh   # xtrace + verbose
+```
+
+```bash Strict script
+nash -eiu script.sh  # errexit + interactive + nounset
+```
+</CodeGroup>
+
+## Nash-Specific Flags
+
+These flags control Nash's sandboxing and VFS behavior.
+
+<ParamField path="-U, --user" type="string" default="user">
+  Set the session username. Creates `/home/<username>` and sets `$USER`, `$LOGNAME`, and `$HOME`.
+  
+  ```bash
+  nash -U alice
+  nash --user bob
+  ```
+  
+  Prompt output:
+  ```
+  alice@nash:/home/alice$
+  ```
+  
+  The username must be 1-32 characters, alphanumeric plus `_` and `-`.
+</ParamField>
+
+<ParamField path="-C, --cwd" type="string">
+  Override the starting directory inside the VFS.
+  
+  ```bash
+  nash -C /tmp
+  nash --cwd /var/log
+  ```
+  
+  Default: `/home/<username>`
+  
+  The directory is created if it doesn't exist.
+</ParamField>
+
+<ParamField path="-E, --env" type="string" repeatable>
+  Set environment variables inside Nash using `KEY=VALUE` format. Repeatable.
+  
+  ```bash
+  nash -E DEBUG=true -E API_URL=http://localhost:8080
+  nash --env FOO=bar --env BAZ=qux
+  ```
+  
+  Variables set with `-E` override defaults and are accessible via `$KEY`:
+  
+  ```bash
+  nash -E CUSTOM=value -c 'echo $CUSTOM'
+  # Output: value
+  ```
+</ParamField>
+
+<ParamField path="-B, --bind" type="string" repeatable>
+  Mount a host directory into the VFS read-write. Format: `HOST:VFS`. Repeatable.
+  
+  ```bash
+  nash -B ./project:/project
+  nash --bind ./data:/data --bind ./config:/etc/config
+  ```
+  
+  Files in the host directory become accessible at the VFS path:
+  
+  ```bash
+  nash -B ./src:/src -c 'ls /src'
+  ```
+  
+  Writes inside the VFS path are reflected on the host filesystem.
+</ParamField>
+
+<ParamField path="--bind-ro" type="string" repeatable>
+  Mount a host directory into the VFS read-only. Format: `HOST:VFS`. Repeatable.
+  
+  ```bash
+  nash --bind-ro ./data:/data
+  nash --bind-ro /etc/config:/config
+  ```
+  
+  Attempts to write to the mount point will fail:
+  
+  ```bash
+  nash --bind-ro ./data:/data -c 'echo test > /data/file.txt'
+  # Error: read-only mount
+  ```
+</ParamField>
+
+### Mount Examples
+
+<Tabs>
+  <Tab title="Single mount">
+    ```bash
+    nash -B ./project:/project -C /project
+    ```
+    
+    Starts Nash inside `/project` with host `./project` mounted read-write.
+  </Tab>
+  
+  <Tab title="Multiple mounts">
+    ```bash
+    nash -B ./src:/src -B ./data:/data --bind-ro ./config:/config
+    ```
+    
+    Mounts three directories: `src` and `data` read-write, `config` read-only.
+  </Tab>
+  
+  <Tab title="Script with mount">
+    ```bash
+    nash --bind ./logs:/var/log analyze.sh
+    ```
+    
+    Runs `analyze.sh` with host `./logs` accessible at `/var/log` in the VFS.
+  </Tab>
+</Tabs>
+
+## General Options
+
+<ParamField path="--rcfile" type="string">
+  Source a custom rc file instead of the default `~/.nashrc`.
+  
+  ```bash
+  nash --rcfile ./custom.nashrc
+  nash --rcfile /path/to/init.sh
+  ```
+  
+  The rc file is sourced from the VFS if present, otherwise from the host filesystem.
+</ParamField>
+
+<ParamField path="--norc" type="boolean">
+  Do not source any rc file on startup.
+  
+  ```bash
+  nash --norc
+  nash --norc script.sh
+  ```
+  
+  Useful for clean, reproducible environments.
+</ParamField>
+
+<ParamField path="--version" type="boolean">
+  Print the Nash version and exit.
+  
+  ```bash
+  nash --version
+  ```
+  
+  Output:
+  ```
+  nash 0.1.0
+  ```
+</ParamField>
+
+<ParamField path="-h, --help" type="boolean">
+  Print help information and exit.
+  
+  ```bash
+  nash --help
+  nash -h
+  ```
+  
+  Displays usage, flags, and examples.
+</ParamField>
+
+## Flag Combinations
+
+Nash flags can be combined to create powerful, customized environments.
+
+### Development Environment
+
+```bash
+nash -U dev \
+     -C /workspace \
+     -B ./project:/workspace \
+     -E DEBUG=true \
+     -E NODE_ENV=development
+```
+
+Sets up:
+- User: `dev`
+- Working directory: `/workspace`
+- Host `./project` mounted at `/workspace`
+- Environment: `DEBUG=true`, `NODE_ENV=development`
+
+### Strict Script Execution
+
+```bash
+nash -eux \
+     --bind-ro ./config:/config \
+     -E ENV=production \
+     deploy.sh
+```
+
+- `-e`: Exit on error
+- `-u`: Error on undefined variables
+- `-x`: Trace execution
+- Read-only config mount
+- Production environment variable
+
+### Isolated Testing
+
+```bash
+nash --norc \
+     -C /tmp \
+     -E TEST_MODE=true \
+     test-script.sh
+```
+
+- No rc file loaded
+- Starts in `/tmp`
+- Custom test environment
+
+## Default Environment Variables
+
+Nash sets these environment variables by default (overridable with `-E`):
+
+| Variable | Default Value |
+|----------|---------------|
+| `USER` | Username from `-U` (default: `user`) |
+| `LOGNAME` | Same as `USER` |
+| `HOME` | `/home/<user>` |
+| `SHELL` | `nash` |
+| `TERM` | `xterm-256color` |
+| `LANG` | `en_US.UTF-8` |
+| `LC_ALL` | `en_US.UTF-8` |
+| `PATH` | `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` |
+| `PWD` | Current working directory |
+| `OLDPWD` | Previous directory (for `cd -`) |
+| `HOSTNAME` | `nash` |
+| `SHLVL` | `1` |
+| `_` | `nash` |
+| `-` | Active shell flags (e.g., `eux`) |
+
+### Overriding Defaults
+
+```bash
+nash -E HOME=/custom/home -E PATH=/custom/bin -c 'echo $HOME:$PATH'
+# Output: /custom/home:/custom/bin
+```
+
+## Execution Mode Priority
+
+When multiple flags are provided, Nash follows this priority order:
+
+1. `-c CMD` → Execute command string and exit
+2. `-s` → Read from stdin
+3. `SCRIPT` → Run script file
+4. `-i` → Force interactive REPL
+5. Stdin is TTY → Interactive REPL (default)
+6. Stdin is pipe → Read from stdin (implicit `-s`)
+
+<Note>
+If `-c` is provided, all other execution modes are ignored.
+</Note>
+
+## Examples
+
+### Quick Command
+
+```bash
+nash -c "echo \$USER is in \$PWD"
+```
+
+### Interactive with Custom User
+
+```bash
+nash -U alice -C /tmp
+```
+
+### Script with Debugging
+
+```bash
+nash -x -e script.sh
+```
+
+### Mounted Workspace
+
+```bash
+nash -B ./project:/work -C /work
+```
+
+### Production Script Runner
+
+```bash
+nash -eux \
+     --bind-ro ./config:/config \
+     --bind ./data:/data \
+     -E ENV=prod \
+     --norc \
+     run.sh
+```
+
+## See Also
+
+- [Interactive Mode](/usage/interactive-mode) - Using the Nash REPL
+- [Script Execution](/usage/script-execution) - Running scripts
+- [RC Files](/usage/rc-files) - Initialization and configuration

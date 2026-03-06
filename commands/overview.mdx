@@ -1,0 +1,326 @@
+---
+title: "Command Reference"
+description: "Complete reference for all 28 Nash built-in commands"
+icon: "terminal"
+---
+
+Nash includes **28 built-in commands** that provide essential Unix/Linux command-line functionality entirely within the sandbox. Unlike traditional shells that invoke system binaries, Nash commands operate exclusively through the Virtual Filesystem (VFS) API—no system processes are ever spawned.
+
+<Note>
+  All Nash commands are built-in and sandboxed. They never invoke system binaries or access the host filesystem directly (except through explicit `--bind` mounts).
+</Note>
+
+## Quick Navigation
+
+<CardGroup cols={3}>
+  <Card title="File Operations" icon="file" href="#file-operations">
+    cat, cp, mv, rm, touch, file, stat
+  </Card>
+  <Card title="Directory Operations" icon="folder" href="#directory-operations">
+    ls, cd, pwd, mkdir, tree, find
+  </Card>
+  <Card title="Text Processing" icon="text" href="#text-processing">
+    grep, sed, cut, sort, uniq, wc, head, tail
+  </Card>
+  <Card title="Data Processing" icon="brackets-curly" href="#data-processing">
+    jq - JSON query and manipulation
+  </Card>
+  <Card title="Environment" icon="gear" href="#environment">
+    env, export, unset
+  </Card>
+  <Card title="Utilities" icon="wrench" href="#utilities">
+    echo, clear, help, history, which, test, true, false
+  </Card>
+</CardGroup>
+
+---
+
+## File Operations
+
+Commands for reading, writing, and manipulating files.
+
+<CardGroup cols={2}>
+  <Card title="cat" icon="file-lines" href="/commands/cat">
+    Concatenate and print files
+  </Card>
+  <Card title="cp" icon="copy" href="/commands/cp">
+    Copy files and directories
+  </Card>
+  <Card title="mv" icon="arrow-right" href="/commands/mv">
+    Move or rename files
+  </Card>
+  <Card title="rm" icon="trash" href="/commands/rm">
+    Remove files and directories
+  </Card>
+  <Card title="touch" icon="hand-pointer" href="/commands/touch">
+    Create empty files or update timestamps
+  </Card>
+  <Card title="file" icon="magnifying-glass" href="/commands/file">
+    Determine file type from magic bytes
+  </Card>
+  <Card title="stat" icon="info" href="/commands/stat">
+    Display file status and metadata
+  </Card>
+</CardGroup>
+
+---
+
+## Directory Operations
+
+Commands for navigating and managing directories.
+
+<CardGroup cols={2}>
+  <Card title="ls" icon="list" href="/commands/ls">
+    List directory contents
+  </Card>
+  <Card title="cd" icon="folder-open" href="/commands/cd">
+    Change current directory
+  </Card>
+  <Card title="pwd" icon="location-dot" href="/commands/pwd">
+    Print working directory path
+  </Card>
+  <Card title="mkdir" icon="folder-plus" href="/commands/mkdir">
+    Create directories
+  </Card>
+  <Card title="tree" icon="sitemap" href="/commands/tree">
+    Display directory tree structure
+  </Card>
+  <Card title="find" icon="magnifying-glass" href="/commands/find">
+    Search for files in directory hierarchy
+  </Card>
+</CardGroup>
+
+---
+
+## Text Processing
+
+Commands for filtering, transforming, and analyzing text.
+
+<CardGroup cols={2}>
+  <Card title="grep" icon="filter" href="/commands/grep">
+    Search for patterns in text
+  </Card>
+  <Card title="sed" icon="pen-to-square" href="/commands/sed">
+    Stream editor for text transformation
+  </Card>
+  <Card title="cut" icon="scissors" href="/commands/cut">
+    Extract fields from lines
+  </Card>
+  <Card title="sort" icon="arrow-down-a-z" href="/commands/sort">
+    Sort lines of text
+  </Card>
+  <Card title="uniq" icon="fingerprint" href="/commands/uniq">
+    Filter duplicate lines
+  </Card>
+  <Card title="wc" icon="hashtag" href="/commands/wc">
+    Count lines, words, and bytes
+  </Card>
+  <Card title="head" icon="arrow-up" href="/commands/head-tail">
+    Output first part of files
+  </Card>
+  <Card title="tail" icon="arrow-down" href="/commands/head-tail">
+    Output last part of files
+  </Card>
+</CardGroup>
+
+---
+
+## Data Processing
+
+<Card title="jq" icon="brackets-curly" href="/commands/jq">
+  **JSON processor** — Query and transform JSON data with `.key`, `keys`, `values`, `length`, `type`, and `.[]` operators
+</Card>
+
+---
+
+## Environment
+
+Commands for managing environment variables.
+
+<CardGroup cols={2}>
+  <Card title="env" icon="list-check" href="/commands/env">
+    Display all environment variables
+  </Card>
+  <Card title="export" icon="upload" href="/commands/export">
+    Set environment variables
+  </Card>
+  <Card title="unset" icon="xmark" href="/commands/unset">
+    Remove environment variables
+  </Card>
+</CardGroup>
+
+---
+
+## Utilities
+
+General-purpose utility commands.
+
+<CardGroup cols={2}>
+  <Card title="echo" icon="message" href="/commands/echo">
+    Print text to stdout
+  </Card>
+  <Card title="clear" icon="eraser" href="/commands/clear">
+    Clear the terminal screen
+  </Card>
+  <Card title="help" icon="circle-question" href="/commands/help">
+    Display command reference
+  </Card>
+  <Card title="history" icon="clock-rotate-left" href="/commands/history">
+    Show command history
+  </Card>
+  <Card title="which" icon="location-crosshairs" href="/commands/which">
+    Locate command in Nash builtins
+  </Card>
+  <Card title="test / [" icon="check" href="/commands/test">
+    Evaluate conditional expressions
+  </Card>
+  <Card title="true" icon="check" href="/commands/true-false">
+    Return success (exit code 0)
+  </Card>
+  <Card title="false" icon="xmark" href="/commands/true-false">
+    Return failure (exit code 1)
+  </Card>
+</CardGroup>
+
+---
+
+## Complete Command Reference
+
+<Accordion title="Full Command Table with Descriptions and Flags">
+
+| Command | Description | Key Flags |
+|---------|-------------|----------|
+| `cat` | Print files or pass-through stdin | None |
+| `cd` | Change directory | Special: `cd -` (previous), `cd` (home) |
+| `clear` | Clear terminal screen | None |
+| `cp` | Copy files | None |
+| `cut` | Cut fields from lines | `-d` delimiter, `-f` fields, `-c` characters |
+| `echo` | Print text | `-n` no newline, `-e` escape sequences |
+| `env` | List environment variables | None |
+| `export` | Set environment variable | Format: `KEY=VALUE` |
+| `false` | Exit with code 1 | None |
+| `file` | Detect file type | Uses magic bytes + extension heuristic |
+| `find` | Search for files | `-name` glob, `-type` f\|d, `-maxdepth` N |
+| `grep` | Filter lines by pattern | `-v` invert, `-i` ignore case, `-n` line numbers |
+| `head` | First N lines | `-n N` number of lines |
+| `help` | Full command reference | None |
+| `history` | Show command history | Optional: `history N` to limit |
+| `jq` | Process JSON | `.key`, `keys`, `values`, `length`, `type`, `.[]` |
+| `ls` | List directory | `-l` long format, `-a` show hidden |
+| `mkdir` | Create directory | `-p` create parents |
+| `mv` | Move or rename files | None |
+| `pwd` | Print working directory | None |
+| `rm` | Remove files/directories | `-r` recursive, `-f` force (combine as `-rf`) |
+| `sed` | Stream editor | `s/old/new/[g]`, `Nd` delete line N, `d` delete all |
+| `sort` | Sort lines | `-r` reverse, `-u` unique |
+| `stat` | File status | Shows size, type, path |
+| `tail` | Last N lines | `-n N` number of lines |
+| `test` / `[` | Evaluate expressions | `-f` file, `-d` dir, `-e` exists, `-z` empty, `-n` not empty, `=` equals, `-eq` numeric equal |
+| `touch` | Create empty file | None |
+| `tree` | Directory tree view | `-L N` max depth, `-a` show hidden |
+| `true` | Exit with code 0 | None |
+| `uniq` | Filter adjacent duplicates | `-c` count, `-d` duplicates only, `-u` unique only |
+| `unset` | Unset environment variable | None |
+| `wc` | Count lines/words/bytes | `-l` lines, `-w` words, `-c` bytes |
+| `which` | Check if command is builtin | None |
+
+</Accordion>
+
+---
+
+## Differences from Standard Unix Commands
+
+<Warning>
+  Nash commands are **compatible subsets** of their Unix counterparts. They implement the most commonly used flags and behaviors, but not every advanced feature.
+</Warning>
+
+### Key Compatibility Notes
+
+<AccordionGroup>
+  <Accordion title="Regular Expressions">
+    Nash's `grep` and `sed` use **substring matching**, not full regex. Complex patterns like `^start.*end$` or `\d+` are not supported.
+  </Accordion>
+
+  <Accordion title="Glob Patterns">
+    `find -name` supports minimal glob: `*` (any chars) and `?` (single char). Character classes like `[0-9]` are not supported.
+  </Accordion>
+
+  <Accordion title="JSON Processing">
+    `jq` supports basic operations (`.key`, `keys`, `values`, `length`, `type`, `.[]`) but not advanced queries, filters, or transformations like `select()`, `map()`, or recursive descent.
+  </Accordion>
+
+  <Accordion title="Permissions">
+    `ls -l` shows fixed permissions. Nash VFS doesn't implement full Unix permission modes or ownership.
+  </Accordion>
+
+  <Accordion title="Exit Codes">
+    Commands follow Unix conventions: `0` for success, `1` for errors, `2` for usage errors. Use `$?` to check exit status.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Command Examples
+
+### File Processing Pipeline
+
+```bash
+# Find all .txt files, search for pattern, count matches
+find /home/user -name "*.txt" | while read f; do grep -i "error" "$f"; done | wc -l
+```
+
+### Directory Tree Analysis
+
+```bash
+# Show directory tree with 2 levels, including hidden files
+tree -L 2 -a /home/user
+```
+
+### JSON Data Extraction
+
+```bash
+# Extract all keys from JSON file
+cat data.json | jq keys
+
+# Get specific field
+cat config.json | jq .database.host
+```
+
+### Text Transformation
+
+```bash
+# Sort unique lines from multiple files
+cat *.log | sort -u > combined.log
+
+# Replace text in stream
+cat input.txt | sed 's/old/new/g' > output.txt
+```
+
+### Conditional Execution
+
+```bash
+# Check if file exists before processing
+test -f config.json && echo "Config found" || echo "Missing config"
+
+# Using bracket syntax
+[ -d /var/log ] && cd /var/log
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="View Individual Commands" icon="book" href="/commands/cat">
+    Detailed documentation for each command
+  </Card>
+  <Card title="Shell Syntax" icon="code" href="/features/shell-syntax">
+    Learn about pipes, redirects, and operators
+  </Card>
+  <Card title="Scripting Guide" icon="file-code" href="/usage/scripting">
+    Write Nash shell scripts
+  </Card>
+  <Card title="VFS Overview" icon="database" href="/architecture/vfs">
+    Understand the Virtual Filesystem
+  </Card>
+</CardGroup>

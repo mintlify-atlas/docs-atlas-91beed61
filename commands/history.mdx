@@ -1,0 +1,313 @@
+---
+title: history
+description: Display command history
+---
+
+## Overview
+
+The `history` command displays a list of previously executed commands in the current Nash shell session. Each command is shown with a line number for easy reference.
+
+## Syntax
+
+```bash
+history [N]
+```
+
+## Description
+
+The `history` command shows commands that have been executed in the current interactive Nash session. Commands are numbered sequentially starting from 1. An optional argument can limit the output to the last N entries.
+
+## Arguments
+
+<ParamField path="N" type="number" optional>
+  Limit output to the last N history entries. If not specified, all history entries are displayed.
+</ParamField>
+
+## Examples
+
+### Display All History
+
+```bash
+history
+# Output:
+#     1  ls
+#     2  cd /home/user
+#     3  cat file.txt
+#     4  grep pattern data.txt
+#     5  history
+```
+
+### Display Last N Commands
+
+```bash
+history 3
+# Output:
+#     3  cat file.txt
+#     4  grep pattern data.txt
+#     5  history 3
+```
+
+### Display Last 10 Commands
+
+```bash
+history 10
+# Shows the last 10 commands executed
+```
+
+### Display Single Last Command
+
+```bash
+history 1
+# Output:
+#     5  history 1
+# (shows only the most recent command)
+```
+
+## Output Format
+
+Each line follows this format:
+
+```
+<line-number>  <command>
+```
+
+- Line numbers are right-aligned and padded with spaces
+- Line numbers are at least 5 characters wide
+- Two spaces separate the line number from the command
+- Commands are shown exactly as they were entered
+
+## Practical Use Cases
+
+### Review Recent Commands
+
+```bash
+history 20
+# Review the last 20 commands to recall what you've done
+```
+
+### Find Previously Used Commands
+
+```bash
+history | grep git
+# Find all git commands in history
+```
+
+### Search for Specific Pattern
+
+```bash
+history | grep -i api
+# Find all commands containing "api" (case-insensitive)
+```
+
+### Count Total Commands
+
+```bash
+history | wc -l
+# Output: 42
+# Shows total number of commands in history
+```
+
+### Extract Command by Number
+
+```bash
+history | grep "^    5"
+# Find command number 5
+```
+
+### Recent Command Summary
+
+```bash
+echo "Last 5 commands:"
+history 5
+```
+
+### Audit Session Activity
+
+```bash
+# Save history to file for review
+history > session-log.txt
+echo "Session saved to session-log.txt"
+```
+
+### Filter by Command Type
+
+```bash
+# Find all file operations
+history | grep -E "cp|mv|rm|touch"
+
+# Find all text processing
+history | grep -E "grep|sed|awk|cut"
+
+# Find all directory operations
+history | grep -E "cd|mkdir|ls|pwd"
+```
+
+### Check Command Frequency
+
+```bash
+# Find most commonly used commands
+history | cut -c8- | cut -d' ' -f1 | sort | uniq -c | sort -rn
+```
+
+### Review Long Commands
+
+```bash
+# Find commands longer than 50 characters
+history | grep -E ".{50,}"
+```
+
+## Combining with Other Commands
+
+<CodeGroup>
+```bash Filter and display
+history | grep export
+# Output:
+#     7  export API_KEY=abc123
+#    12  export PORT=8080
+```
+
+```bash Count specific commands
+history | grep -c "git "
+# Output: 8
+```
+
+```bash Last command only
+history 1
+# Shows only the most recent command
+```
+
+```bash Extract command text
+history | tail -5 | cut -c8-
+# Shows last 5 commands without line numbers
+```
+</CodeGroup>
+
+## History Persistence
+
+<Warning>
+Nash command history is **session-based** and **not persistent**:
+
+- History is stored in memory only
+- History is cleared when the shell exits
+- Each new Nash session starts with empty history
+- No history file is saved to disk by default
+
+If you need to preserve history between sessions, manually save it:
+
+```bash
+history > ~/.nash_history
+```
+</Warning>
+
+## Interactive Session Only
+
+<Note>
+The `history` command only works in interactive mode:
+
+```bash
+# Interactive shell (works)
+nash
+user@nash$ history
+# Shows history
+
+# Non-interactive (empty)
+nash -c "history"
+# Shows nothing (no interactive history)
+
+# Script file (empty)
+echo "history" > script.sh
+nash script.sh
+# Shows nothing (no interactive history)
+```
+</Note>
+
+## History Size
+
+Nash maintains unlimited history during a session (memory permitting). There is no built-in limit on the number of commands stored.
+
+```bash
+# Check history size
+history | wc -l
+# Returns total number of commands in current session
+```
+
+## Command Recall
+
+<Note>
+While Nash stores command history, it currently does not support:
+
+- History expansion (`!N`, `!!`, `!string`)
+- Reverse history search (Ctrl+R)
+- History substitution
+
+History is view-only via the `history` command.
+</Note>
+
+## Limiting Output Examples
+
+```bash
+# Last 5 commands
+history 5
+
+# Last 10 commands
+history 10
+
+# Last 100 commands
+history 100
+
+# All commands (no limit)
+history
+```
+
+## Notes
+
+<Note>
+- History starts at line number 1
+- Each executed command is immediately added to history
+- The `history` command itself appears in history
+- Line numbers are sequential and don't skip
+- Empty commands are not added to history
+- Invalid limit values are ignored (shows all history)
+</Note>
+
+## Common Patterns
+
+### Session Documentation
+
+```bash
+# At end of session, save history with timestamp
+echo "Session $(date)" > session-notes.txt
+history >> session-notes.txt
+```
+
+### Recent Activity Check
+
+```bash
+echo "Recent activity:"
+history 10
+```
+
+### Command Statistics
+
+```bash
+echo "Total commands: $(history | wc -l)"
+echo "Last command: $(history 1 | cut -c8-)"
+```
+
+### Find Command with Pattern
+
+```bash
+# Find all export commands
+history | grep "^.*export" 
+```
+
+## Exit Status
+
+The `history` command always returns exit code `0` (success).
+
+## Related Commands
+
+- [help](/commands/help) - Display help information
+- [which](/commands/which) - Check command availability
+- [grep](/commands/grep) - Filter history output
+- [cat](/commands/cat) - View saved history files
