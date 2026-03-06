@@ -1,0 +1,197 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Nash",
+  "projectDescription": "A sandboxed, bash-like command interpreter for AI agents with full VFS isolation",
+  "theme": "aspen",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Usage Guide",
+            "pages": [
+              "usage/interactive-mode",
+              "usage/script-execution",
+              "usage/cli-flags",
+              "usage/rc-files"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/sandbox-security",
+              "features/virtual-filesystem",
+              "features/host-mounts",
+              "features/environment-variables",
+              "features/shell-syntax"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic-commands",
+              "examples/pipes-redirections",
+              "examples/working-with-files",
+              "examples/scripting"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/parser",
+              "architecture/runtime",
+              "architecture/vfs",
+              "architecture/builtins"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Command Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "commands/overview"
+            ]
+          },
+          {
+            "group": "File Operations",
+            "pages": [
+              "commands/cat",
+              "commands/cp",
+              "commands/mv",
+              "commands/rm",
+              "commands/touch",
+              "commands/ls",
+              "commands/file",
+              "commands/stat"
+            ]
+          },
+          {
+            "group": "Directory Operations",
+            "pages": [
+              "commands/cd",
+              "commands/pwd",
+              "commands/mkdir",
+              "commands/tree",
+              "commands/find"
+            ]
+          },
+          {
+            "group": "Text Processing",
+            "pages": [
+              "commands/echo",
+              "commands/cat",
+              "commands/grep",
+              "commands/sed",
+              "commands/cut",
+              "commands/sort",
+              "commands/uniq",
+              "commands/wc",
+              "commands/head-tail"
+            ]
+          },
+          {
+            "group": "Data Processing",
+            "pages": [
+              "commands/jq"
+            ]
+          },
+          {
+            "group": "Environment & Shell",
+            "pages": [
+              "commands/env",
+              "commands/export",
+              "commands/unset",
+              "commands/test",
+              "commands/which",
+              "commands/history"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "commands/clear",
+              "commands/help",
+              "commands/true-false"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Fully sandboxed execution with zero system calls",
+    "In-memory Virtual Filesystem with Unix directory structure",
+    "28 built-in bash-like commands (grep, sed, find, jq, etc.)",
+    "Bash-compatible syntax: pipes, redirections, &&, ||, subshells",
+    "Host directory mounts with read-only and read-write modes",
+    "Interactive REPL with readline history and Ctrl-C/D support",
+    "Script execution from files or stdin",
+    "Multi-user support with isolated home directories"
+  ],
+  "publicApiSurface": [
+    "nash (interactive REPL)",
+    "nash <script.sh> (script execution)",
+    "nash -c <command> (one-shot command)",
+    "nash -s (read from stdin)",
+    "nash -U <user> (set username)",
+    "nash -C <path> (set working directory)",
+    "nash -E <KEY=VALUE> (set env vars)",
+    "nash -B <host:vfs> (mount directory)",
+    "nash --bind-ro <host:vfs> (mount read-only)",
+    "nash -e (errexit mode)",
+    "nash -u (nounset mode)",
+    "nash -x (xtrace mode)",
+    "nash -v (verbose mode)",
+    "nash --rcfile <file> (custom rc file)",
+    "nash --norc (skip rc files)",
+    "cat",
+    "cd",
+    "clear",
+    "cp",
+    "cut",
+    "echo",
+    "env",
+    "export",
+    "false",
+    "file",
+    "find",
+    "grep",
+    "head",
+    "tail",
+    "help",
+    "history",
+    "jq",
+    "ls",
+    "mkdir",
+    "mv",
+    "pwd",
+    "rm",
+    "sed",
+    "sort",
+    "stat",
+    "test",
+    "touch",
+    "tree",
+    "true",
+    "uniq",
+    "unset",
+    "wc",
+    "which"
+  ]
+}
